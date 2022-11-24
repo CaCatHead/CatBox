@@ -44,6 +44,10 @@ fn main() {
 
     println!("Id: {}", child.id());
 
+    let h = cgroups_rs::hierarchies::auto();
+    let cgroup = cgroups_rs::cgroup_builder::CgroupBuilder::new("catbox").build(h);
+    cgroup.add_task((&child).into()).unwrap();
+
     let status = match child.wait_timeout(time_limit).unwrap() {
         Some(status) => {
             status.code().unwrap()

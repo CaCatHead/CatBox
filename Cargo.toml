@@ -6,5 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cgroups-rs = "0.2.11"
 structopt = "0.3"
 wait-timeout = "0.1.5"
