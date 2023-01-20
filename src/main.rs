@@ -1,3 +1,4 @@
+use std::env;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -106,17 +107,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = Cli::parse();
   let params = cli.resolve();
 
-  Logger::try_with_str("info")?
+  Logger::try_with_str("catbox=info")?
     .log_to_file(
       FileSpec::default()
         .directory("logs")
-        .basename("catbox")
+        .basename(env::var("LOG_DIR").unwrap_or("./logs/".into()))
         .discriminant(format!("{}", chrono::offset::Local::now().format("%Y-%m-%d")))
         .suppress_timestamp()
     )
-    .append()// write logs to file
+    .append()
     .duplicate_to_stderr(Duplicate::Warn)
-    .format_for_files(default_format)// print warnings and errors also to the console
+    .format_for_files(default_format)
     .start()?;
 
   info!("Start running catbox");
