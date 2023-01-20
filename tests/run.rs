@@ -5,7 +5,7 @@ use flexi_logger::Logger;
 use log::info;
 use tempfile::tempdir;
 
-use catbox::sandbox::{CatBoxParams, run};
+use catj::sandbox::{CatBoxParams, run};
 
 fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
   Logger::try_with_str("catbox=info")?.start()?;
