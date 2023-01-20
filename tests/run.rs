@@ -1,9 +1,8 @@
-use std::env;
 use std::path::Path;
 use std::process::Command;
-use flexi_logger::{default_format, Duplicate, FileSpec, Logger};
-use log::info;
 
+use flexi_logger::Logger;
+use log::info;
 use tempfile::tempdir;
 
 use catbox::sandbox::{CatBoxParams, run};

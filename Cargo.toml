@@ -19,5 +19,5 @@ chrono = "0.4.23"
 clap = { version = "4.1.1", features = ["derive"] }
 flexi_logger = "0.24.2"
 log = "0.4"
-nix = { version = "0.26.2", features = ["process"] }
+nix = { version = "0.26.2", features = ["signal", "process"] }
 tempfile = "3"

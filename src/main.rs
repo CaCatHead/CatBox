@@ -123,7 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   info!("Start running catbox");
 
   for param in params {
-    run(param);
+    run(param)?;
   }
 
   info!("Running catbox finished");

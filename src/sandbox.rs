@@ -1,10 +1,10 @@
-use std::ffi::{CStr, CString};
+use std::ffi::{c_uint, CString};
 use std::path::PathBuf;
-use log::{error, info};
 
+use log::{error, info};
 use nix::libc;
-use nix::sys::wait::waitpid;
-use nix::unistd::{execve, fork, ForkResult};
+use nix::sys::wait::{waitpid, WaitStatus};
+use nix::unistd::{alarm, execve, fork, ForkResult};
 
 #[derive(Debug)]
 pub struct CatBoxParams {
@@ -31,10 +31,33 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
   match unsafe { fork() } {
     Ok(ForkResult::Parent { child, .. }) => {
       info!("Start running child process (pid = {})", child);
-      waitpid(child, None).unwrap();
-      Ok(())
+
+      loop {
+        let status = waitpid(child, None).unwrap();
+        match status {
+          WaitStatus::Exited(_, _) => {
+            break Ok(());
+          }
+          WaitStatus::Signaled(_, signal, _) => {
+            info!("Child process is signaled by {}", signal);
+            break Ok(());
+          }
+          WaitStatus::Stopped(_, signal) => {
+            info!("Child process is stopped by {}", signal);
+          }
+          WaitStatus::PtraceEvent(_, _, _) => {}
+          WaitStatus::PtraceSyscall(_) => {}
+          WaitStatus::Continued(_) => {}
+          WaitStatus::StillAlive => {}
+        }
+      }
     }
     Ok(ForkResult::Child) => {
+      // 设置时钟，time_limit + 1 秒后，结束
+      let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as c_uint;
+      alarm::set(time_limit + 1);
+
+      // execve 运行用户程序
       let program = CString::new(params.program.to_str().unwrap()).unwrap();
       let path = program.clone();
       let path = path.as_ref();
