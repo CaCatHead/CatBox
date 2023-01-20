@@ -1,56 +1,93 @@
-use std::time::Duration;
+use std::path::PathBuf;
 
-use structopt::StructOpt;
-use wait_timeout::ChildExt;
+use clap::{Parser, Subcommand};
 
-#[derive(Debug, StructOpt)]
-#[structopt(about = "A light process isolation sandbox used for competitive programming contest")]
-struct CliOption {
-  #[structopt(short, long, default_value = "1")]
+use crate::sandbox::{CatBoxParams, run};
+
+mod sandbox;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+  #[arg(short, long, default_value_t = 1000)]
   time: u64,
 
-  #[structopt(short, long, default_value = "65536")]
+  #[arg(short, long, default_value_t = 65536)]
   memory: u64,
 
+  #[arg(long, default_value_t = false)]
+  verbose: bool,
+
+  #[arg(long, default_value = "/dev/null")]
+  stdin: PathBuf,
+
+  #[arg(long, default_value = "/dev/null")]
+  stdout: PathBuf,
+
+  #[arg(long, default_value = "/dev/null")]
+  stderr: PathBuf,
+
   #[structopt(subcommand)]
-  command: RunCommand,
+  command: Commands,
 }
 
-#[derive(Debug, StructOpt)]
-enum RunCommand {
-  #[structopt(external_subcommand)]
-  List(Vec<String>)
+#[derive(Subcommand, Debug)]
+enum Commands {
+  #[command(about = "Run user program")]
+  Run {
+    #[arg(help = "Program")]
+    program: PathBuf,
+
+    #[arg(help = "Arguments")]
+    arguments: Vec<String>,
+  },
+
+  #[command(about = "Compile user code")]
+  Compile {
+    #[arg(help = "Compiler")]
+    compiler: PathBuf,
+
+    #[arg(help = "Arguments")]
+    arguments: Vec<String>,
+  },
+
+  #[command(about = "Run validator")]
+  Validate {
+    #[arg(help = "Validator")]
+    validator: PathBuf,
+  },
+
+  #[command(about = "Run checker")]
+  Check {
+    #[arg(help = "Checker")]
+    checker: PathBuf,
+  },
 }
 
-impl RunCommand {
-  fn get(&self) -> std::process::Command {
-    let input = match self {
-      RunCommand::List(v) => v,
+impl Cli {
+  fn resolve(self) -> Vec<CatBoxParams> {
+    let command = match self.command {
+      Commands::Compile { compiler, arguments } => { unimplemented!() }
+      Commands::Run { program, arguments } => { (program, arguments) }
+      Commands::Validate { validator } => { unimplemented!() }
+      Commands::Check { checker } => { unimplemented!() }
     };
-    let program = input.first().unwrap();
-    let args = input.iter().skip(1).collect::<Vec<&String>>();
-    let mut command = std::process::Command::new(program.clone());
-    command.args(args.clone());
-    command
+
+    vec![
+      CatBoxParams {
+        time_limit: self.time,
+        memory_limit: self.memory,
+        program: command.0,
+        arguments: command.1,
+      }
+    ]
   }
 }
 
 fn main() {
-  let option = CliOption::from_args();
-  dbg!(option);
-
-  let time_limit = Duration::from_secs(option.time);
-  let mut child = option.command.get().spawn().unwrap();
-
-  let status = match child.wait_timeout(time_limit).unwrap() {
-    Some(status) => {
-      status.code().unwrap()
-    }
-    None => {
-      child.kill().unwrap();
-      child.wait().unwrap().code().unwrap()
-    }
-  };
-
-  println!("Return: {}", status);
+  let cli = Cli::parse();
+  let params = cli.resolve();
+  for param in params {
+    run(param);
+  }
 }

@@ -15,5 +15,5 @@ description = "A light process isolation sandbox used for competitive programmin
 
 [dependencies]
 cgroups-rs = "0.3.0"
-structopt = "0.3"
-wait-timeout = "0.2.0"
+clap = { version = "4.1.1", features = ["derive"] }
+nix = "0.26.2"
