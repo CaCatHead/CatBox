@@ -1,4 +1,4 @@
-# CatBox
+# CatJ
 
 A light process isolation sandbox used for Competitive Programming contest.
 
