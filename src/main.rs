@@ -6,51 +6,51 @@ use wait_timeout::ChildExt;
 #[derive(Debug, StructOpt)]
 #[structopt(about = "A light process isolation sandbox used for competitive programming contest")]
 struct CliOption {
-    #[structopt(short, long, default_value = "1")]
-    time: u64,
+  #[structopt(short, long, default_value = "1")]
+  time: u64,
 
-    #[structopt(short, long, default_value = "65536")]
-    memory: u64,
+  #[structopt(short, long, default_value = "65536")]
+  memory: u64,
 
-    #[structopt(subcommand)]
-    command: RunCommand,
+  #[structopt(subcommand)]
+  command: RunCommand,
 }
 
 #[derive(Debug, StructOpt)]
 enum RunCommand {
-    #[structopt(external_subcommand)]
-    List(Vec<String>)
+  #[structopt(external_subcommand)]
+  List(Vec<String>)
 }
 
 impl RunCommand {
-    fn get(&self) -> std::process::Command {
-        let input = match self {
-            RunCommand::List(v) => v,
-        };
-        let program = input.first().unwrap();
-        let args = input.iter().skip(1).collect::<Vec<&String>>();
-        let mut command = std::process::Command::new(program.clone());
-        command.args(args.clone());
-        command
-    }
+  fn get(&self) -> std::process::Command {
+    let input = match self {
+      RunCommand::List(v) => v,
+    };
+    let program = input.first().unwrap();
+    let args = input.iter().skip(1).collect::<Vec<&String>>();
+    let mut command = std::process::Command::new(program.clone());
+    command.args(args.clone());
+    command
+  }
 }
 
 fn main() {
-    let option = CliOption::from_args();
-    dbg!(option);
+  let option = CliOption::from_args();
+  dbg!(option);
 
-    let time_limit = Duration::from_secs(option.time);
-    let mut child = option.command.get().spawn().unwrap();
+  let time_limit = Duration::from_secs(option.time);
+  let mut child = option.command.get().spawn().unwrap();
 
-    let status = match child.wait_timeout(time_limit).unwrap() {
-        Some(status) => {
-            status.code().unwrap()
-        },
-        None => {
-            child.kill().unwrap();
-            child.wait().unwrap().code().unwrap()
-        }
-    };
+  let status = match child.wait_timeout(time_limit).unwrap() {
+    Some(status) => {
+      status.code().unwrap()
+    }
+    None => {
+      child.kill().unwrap();
+      child.wait().unwrap().code().unwrap()
+    }
+  };
 
-    println!("Return: {}", status);
+  println!("Return: {}", status);
 }
