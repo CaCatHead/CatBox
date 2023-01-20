@@ -8,7 +8,7 @@ use tempfile::tempdir;
 use catj::sandbox::{CatBoxParams, run};
 
 fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
-  Logger::try_with_str("catbox=info")?.start()?;
+  Logger::try_with_str("catj=info")?.start()?;
   Ok(())
 }
 

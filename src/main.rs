@@ -96,7 +96,7 @@ pub fn default_format(
 ) -> Result<(), std::io::Error> {
   write!(
     w,
-    "[{}: {}] {}",
+    "[{}: {:5}] {}",
     now.format("%Y-%m-%d %H:%M:%S"),
     record.level(),
     record.args()
@@ -107,17 +107,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = Cli::parse();
   let params = cli.resolve();
 
-  Logger::try_with_str("catbox=info")?
+  Logger::try_with_str("catj=info")?
     .log_to_file(
       FileSpec::default()
         .directory(env::var("LOG_DIR").unwrap_or("./logs/".into()))
-        .basename("catbox")
+        .basename("catj")
         .discriminant(format!("{}", chrono::offset::Local::now().format("%Y-%m-%d")))
         .suppress_timestamp()
     )
     .append()
     .duplicate_to_stderr(Duplicate::Warn)
     .format_for_files(default_format)
+    .print_message()
     .start()?;
 
   info!("Start running catbox");
