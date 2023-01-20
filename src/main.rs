@@ -110,8 +110,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   Logger::try_with_str("catbox=info")?
     .log_to_file(
       FileSpec::default()
-        .directory("logs")
-        .basename(env::var("LOG_DIR").unwrap_or("./logs/".into()))
+        .directory(env::var("LOG_DIR").unwrap_or("./logs/".into()))
+        .basename("catbox")
         .discriminant(format!("{}", chrono::offset::Local::now().format("%Y-%m-%d")))
         .suppress_timestamp()
     )

@@ -1,4 +1,10 @@
-use std::path::{PathBuf};
+use std::ffi::{CStr, CString};
+use std::path::PathBuf;
+use log::{error, info};
+
+use nix::libc;
+use nix::sys::wait::waitpid;
+use nix::unistd::{execve, fork, ForkResult};
 
 #[derive(Debug)]
 pub struct CatBoxParams {
@@ -21,7 +27,32 @@ pub struct CatBoxParams {
 //   }
 // }
 
-pub fn run(params: CatBoxParams) {
-  dbg!(&params.program);
-  dbg!(&params.arguments);
+pub fn run(params: CatBoxParams) -> Result<(), String> {
+  match unsafe { fork() } {
+    Ok(ForkResult::Parent { child, .. }) => {
+      info!("Start running child process (pid = {})", child);
+      waitpid(child, None).unwrap();
+      Ok(())
+    }
+    Ok(ForkResult::Child) => {
+      let program = CString::new(params.program.to_str().unwrap()).unwrap();
+      let path = program.clone();
+      let path = path.as_ref();
+      let args = params.arguments.iter().map(|p| CString::new(p.as_str()).unwrap()).collect::<Vec<CString>>();
+      let args = [vec![program], args].concat();
+      let args = args.as_slice();
+      let env: [&CString; 0] = [];
+
+      let result = execve(path, &args, &env);
+      if let Err(e) = result {
+        error!("Execve user submission fails: {}", e.desc());
+        info!("Submission path: {}", params.program.to_string_lossy());
+        let args = args.iter().map(|cstr| cstr.to_string_lossy().into()).collect::<Vec<Box<str>>>();
+        info!("Submission args: {}", args.join(" "));
+      }
+
+      unsafe { libc::_exit(0) };
+    }
+    Err(_) => Err("Fork failed".into()),
+  }
 }
