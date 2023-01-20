@@ -2,10 +2,10 @@ use std::path::{PathBuf};
 
 #[derive(Debug)]
 pub struct CatBoxParams {
-  pub(crate) time_limit: u64,
-  pub(crate) memory_limit: u64,
-  pub(crate) program: PathBuf,
-  pub(crate) arguments: Vec<String>,
+  pub time_limit: u64,
+  pub memory_limit: u64,
+  pub program: PathBuf,
+  pub arguments: Vec<String>,
 }
 
 // impl RunCommand {

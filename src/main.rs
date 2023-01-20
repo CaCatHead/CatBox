@@ -70,10 +70,10 @@ enum Commands {
 impl Cli {
   fn resolve(self) -> Vec<CatBoxParams> {
     let command = match self.command {
-      Commands::Compile { compiler, arguments } => { unimplemented!() }
+      Commands::Compile { compiler: _, arguments: _ } => { unimplemented!() }
       Commands::Run { program, arguments } => { (program, arguments) }
-      Commands::Validate { validator } => { unimplemented!() }
-      Commands::Check { checker } => { unimplemented!() }
+      Commands::Validate { validator: _ } => { unimplemented!() }
+      Commands::Check { checker: _ } => { unimplemented!() }
     };
 
     vec![
