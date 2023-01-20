@@ -15,5 +15,8 @@ description = "A light process isolation sandbox used for competitive programmin
 
 [dependencies]
 cgroups-rs = "0.3.0"
+chrono = "0.4.23"
 clap = { version = "4.1.1", features = ["derive"] }
+flexi_logger = "0.24.2"
+log = "0.4"
 nix = "0.26.2"

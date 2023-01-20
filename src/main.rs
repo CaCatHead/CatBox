@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use flexi_logger::{DeferredNow, Duplicate, FileSpec, Logger};
+use log::{info, Record};
 
 use crate::sandbox::{CatBoxParams, run};
 
@@ -84,10 +86,46 @@ impl Cli {
   }
 }
 
-fn main() {
+/// A logline-formatter that produces log lines like <br>
+/// ```[datetime: INFO] Task successfully read from conf.json```
+pub fn default_format(
+  w: &mut dyn std::io::Write,
+  now: &mut DeferredNow,
+  record: &Record,
+) -> Result<(), std::io::Error> {
+  write!(
+    w,
+    "[{}: {}] {}",
+    now.format("%Y-%m-%d %H:%M:%S"),
+    record.level(),
+    record.args()
+  )
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = Cli::parse();
   let params = cli.resolve();
+
+  Logger::try_with_str("info")?
+    .log_to_file(
+      FileSpec::default()
+        .directory("logs")
+        .basename("catbox")
+        .discriminant(format!("{}", chrono::offset::Local::now().format("%Y-%m-%d")))
+        .suppress_timestamp()
+    )
+    .append()// write logs to file
+    .duplicate_to_stderr(Duplicate::Warn)
+    .format_for_files(default_format)// print warnings and errors also to the console
+    .start()?;
+
+  info!("Start running catbox");
+
   for param in params {
     run(param);
   }
+
+  info!("Running catbox finished");
+
+  Ok(())
 }
