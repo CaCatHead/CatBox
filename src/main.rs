@@ -4,13 +4,13 @@ use structopt::StructOpt;
 use wait_timeout::ChildExt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(about = "A simple sandbox program used for competitive programming contest")]
+#[structopt(about = "A light process isolation sandbox used for competitive programming contest")]
 struct CliOption {
     #[structopt(short, long, default_value = "1")]
     time: u64,
 
-    // #[structopt(short, long, default_value = "65536")]
-    // memory: u64,
+    #[structopt(short, long, default_value = "65536")]
+    memory: u64,
 
     #[structopt(subcommand)]
     command: RunCommand,
@@ -37,16 +37,10 @@ impl RunCommand {
 
 fn main() {
     let option = CliOption::from_args();
-    println!("Option: {:?}", option);
+    dbg!(option);
 
     let time_limit = Duration::from_secs(option.time);
     let mut child = option.command.get().spawn().unwrap();
-
-    println!("Id: {}", child.id());
-
-    let h = cgroups_rs::hierarchies::auto();
-    let cgroup = cgroups_rs::cgroup_builder::CgroupBuilder::new("catbox").build(h);
-    cgroup.add_task((&child).into()).unwrap();
 
     let status = match child.wait_timeout(time_limit).unwrap() {
         Some(status) => {
