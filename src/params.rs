@@ -4,11 +4,23 @@ pub struct CatBoxParams {
   pub memory_limit: u64,
   pub program: String,
   pub arguments: Vec<String>,
+  // pub(crate) uid: number,
+  // pub(crate) gid: number,
+  pub(crate) process: i32,
+  pub(crate) stack_size: i64,
   pub(crate) chroot: bool,
+  pub(crate) mounts: Vec<MountPoint>,
   pub(crate) env: Vec<(String, String)>,
   pub(crate) stdin: String,
   pub(crate) stdout: String,
   pub(crate) stderr: String,
+}
+
+#[derive(Debug)]
+pub struct MountPoint {
+  write: bool,
+  src: String,
+  dst: String,
 }
 
 impl CatBoxParams {
@@ -18,7 +30,10 @@ impl CatBoxParams {
       memory_limit: 262144,
       program,
       arguments,
+      process: 1,
+      stack_size: -1,
       chroot: false,
+      mounts: vec![],
       env: vec![],
       stdin: String::from("/dev/null"),
       stdout: String::from("/dev/null"),
