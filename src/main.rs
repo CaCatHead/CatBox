@@ -52,11 +52,14 @@ enum Commands {
 
   #[command(about = "Compile user code")]
   Compile {
-    #[arg(help = "Submission Code")]
+    #[arg(help = "Submission code file")]
     submission: String,
 
     #[arg(short, long, help = "Language")]
     language: String,
+
+    #[arg(short, long, help = "Output file")]
+    output: String,
   },
 
   #[command(about = "Run validator")]
@@ -75,14 +78,14 @@ enum Commands {
 impl Cli {
   fn resolve(self) -> Vec<CatBoxParams> {
     let mut command = match self.command {
-      Commands::Compile { language, submission } => {
+      Commands::Compile { language, submission, .. } => {
         make_compile_params(language, submission)
       }
       Commands::Run { program, arguments } => {
         CatBoxParams::new(program, arguments)
       }
-      Commands::Validate { validator: _ } => { unimplemented!() }
-      Commands::Check { checker: _ } => { unimplemented!() }
+      Commands::Validate { .. } => { unimplemented!() }
+      Commands::Check { .. } => { unimplemented!() }
     };
 
     command.stdin(self.stdin).stdout(self.stdout).stderr(self.stderr);
