@@ -28,7 +28,6 @@ fn it_should_run() {
 
   info!("Start running ./fixtures/aplusb/ac.cpp");
 
-
   for i in 1..4 {
     let mut params = CatBoxParams::new(executable.clone(), vec![]);
     let sub_in = PathBuf::from(format!("./fixtures/aplusb/testcases/{}.in", i));
