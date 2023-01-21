@@ -1,31 +1,39 @@
 use std::ffi::{c_uint, CString};
-use std::path::PathBuf;
 
+use libc_stdhandle::{stderr, stdin, stdout};
 use log::{error, info};
 use nix::libc;
+use nix::libc::freopen;
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{alarm, execve, fork, ForkResult};
 
-#[derive(Debug)]
-pub struct CatBoxParams {
-  pub time_limit: u64,
-  pub memory_limit: u64,
-  pub program: PathBuf,
-  pub arguments: Vec<String>,
+use crate::CatBoxParams;
+use crate::utils::into_c_string;
+
+/// 设置子进程时钟 signal，运行时限 + 1 秒
+fn set_alarm(params: &CatBoxParams) {
+  let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as c_uint;
+  alarm::set(time_limit + 1);
 }
 
-// impl RunCommand {
-//   fn get(&self) -> std::process::Command {
-//     let input = match self {
-//       RunCommand::List(v) => v,
-//     };
-//     let program = input.first().unwrap();
-//     let args = input.iter().skip(1).collect::<Vec<&String>>();
-//     let mut command = std::process::Command::new(program.clone());
-//     command.args(args.clone());
-//     command
-//   }
-// }
+
+/// 重定向输出输出
+fn redirect_io(params: &CatBoxParams) {
+  unsafe {
+    let in_path = into_c_string(&params.stdin);
+    let mode = CString::new("r").unwrap();
+    freopen(in_path.as_ptr(), mode.as_ptr(), stdin());
+
+    let out_path = into_c_string(&params.stdout);
+    let mode = CString::new("w").unwrap();
+    freopen(out_path.as_ptr(), mode.as_ptr(), stdout());
+
+    let err_path = into_c_string(&params.stderr);
+    let mode = CString::new("w").unwrap();
+    freopen(err_path.as_ptr(), mode.as_ptr(), stderr());
+  }
+}
+
 
 pub fn run(params: CatBoxParams) -> Result<(), String> {
   match unsafe { fork() } {
@@ -35,7 +43,8 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
       loop {
         let status = waitpid(child, None).unwrap();
         match status {
-          WaitStatus::Exited(_, _) => {
+          WaitStatus::Exited(_, status) => {
+            info!("Child process exited with status {}", status);
             break Ok(());
           }
           WaitStatus::Signaled(_, signal, _) => {
@@ -53,12 +62,14 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
       }
     }
     Ok(ForkResult::Child) => {
-      // 设置时钟，time_limit + 1 秒后，结束
-      let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as c_uint;
-      alarm::set(time_limit + 1);
+      // 重定向输入输出
+      redirect_io(&params);
+
+      // 设置时钟
+      set_alarm(&params);
 
       // execve 运行用户程序
-      let program = CString::new(params.program.to_str().unwrap()).unwrap();
+      let program = into_c_string(&params.program);
       let path = program.clone();
       let path = path.as_ref();
       let args = params.arguments.iter().map(|p| CString::new(p.as_str()).unwrap()).collect::<Vec<CString>>();

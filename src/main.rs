@@ -1,13 +1,16 @@
 use std::env;
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{command, Parser, Subcommand};
 use flexi_logger::{DeferredNow, Duplicate, FileSpec, Logger};
 use log::{info, Record};
 
-use crate::sandbox::{CatBoxParams, run};
+pub use crate::params::CatBoxParams;
+pub use crate::sandbox::run;
 
+mod params;
 mod sandbox;
+pub mod utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -15,7 +18,7 @@ struct Cli {
   #[arg(short, long, default_value_t = 1000)]
   time: u64,
 
-  #[arg(short, long, default_value_t = 65536)]
+  #[arg(short, long, default_value_t = 262144)]
   memory: u64,
 
   #[arg(long, default_value_t = false)]
@@ -69,21 +72,16 @@ enum Commands {
 
 impl Cli {
   fn resolve(self) -> Vec<CatBoxParams> {
-    let command = match self.command {
+    let mut command = match self.command {
       Commands::Compile { compiler: _, arguments: _ } => { unimplemented!() }
-      Commands::Run { program, arguments } => { (program, arguments) }
+      Commands::Run { program, arguments } => { CatBoxParams::new(program, arguments) }
       Commands::Validate { validator: _ } => { unimplemented!() }
       Commands::Check { checker: _ } => { unimplemented!() }
     };
 
-    vec![
-      CatBoxParams {
-        time_limit: self.time,
-        memory_limit: self.memory,
-        program: command.0,
-        arguments: command.1,
-      }
-    ]
+    command.stdin(self.stdin).stdout(self.stdout).stderr(self.stderr);
+
+    vec![command]
   }
 }
 

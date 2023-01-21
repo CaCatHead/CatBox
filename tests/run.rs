@@ -1,14 +1,16 @@
-use std::path::Path;
+use std::fmt::format;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use flexi_logger::Logger;
 use log::info;
 use tempfile::tempdir;
 
-use catj::sandbox::{CatBoxParams, run};
+use catj::{CatBoxParams, run};
 
 fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
-  Logger::try_with_str("catj=info")?.start()?;
+  Logger::try_with_str("info")?.start()?;
   Ok(())
 }
 
@@ -17,7 +19,7 @@ fn it_should_run() {
   setup_logger().unwrap();
 
   let dir = tempdir().unwrap();
-  let source = Path::new("./fixtures/aplusb/ac.cpp").to_path_buf();
+  let source = Path::new("./fixtures/aplusb/source/ac.cpp").to_path_buf();
   let executable = dir.path().join("Main.out");
 
   let mut command = Command::new("g++");
@@ -26,12 +28,23 @@ fn it_should_run() {
 
   info!("Start running ./fixtures/aplusb/ac.cpp");
 
-  run(CatBoxParams {
-    time_limit: 1000,
-    memory_limit: 65536,
-    program: executable,
-    arguments: Vec::new(),
-  }).unwrap();
+
+  for i in 1..4 {
+    let mut params = CatBoxParams::new(executable.clone(), vec![]);
+    let sub_in = PathBuf::from(format!("./fixtures/aplusb/testcases/{}.in", i));
+    let sub_out = dir.path().join("sub.out");
+    params.stdin(sub_in.clone()).stdout(sub_out.clone());
+    run(params).unwrap();
+
+    let out = fs::read_to_string(sub_out.clone()).unwrap();
+    let ans = fs::read_to_string(PathBuf::from(format!("./fixtures/aplusb/testcases/{}.ans", i))).unwrap();
+
+    info!("Testcase #{}. out: {}", i, out.trim_end());
+    info!("Testcase #{}. ans: {}", i, ans.trim_end());
+    assert_eq!(out, ans);
+
+    fs::remove_file(sub_out.as_path()).unwrap();
+  }
 
   info!("Running ./fixtures/aplusb/ac.cpp ok");
 }

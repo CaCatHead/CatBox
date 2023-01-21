@@ -57,6 +57,7 @@ dependencies = [
  "chrono",
  "clap",
  "flexi_logger",
+ "libc-stdhandle",
  "log",
  "nix 0.26.2",
  "tempfile",
@@ -350,6 +351,16 @@ name = "libc"
 version = "0.2.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc7fcc620a3bff7cdd7a365be3376c97191aeaccc2a603e600951e452615bf89"
+
+[[package]]
+name = "libc-stdhandle"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dac2473dc28934c5e0b82250dab231c9d3b94160d91fe9ff483323b05797551"
+dependencies = [
+ "cc",
+ "libc",
+]
 
 [[package]]
 name = "link-cplusplus"
