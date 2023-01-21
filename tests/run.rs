@@ -1,4 +1,3 @@
-use std::fmt::format;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -29,9 +28,13 @@ fn it_should_run() {
   info!("Start running ./fixtures/aplusb/ac.cpp");
 
   for i in 1..4 {
+    let executable = executable.to_string_lossy().to_string();
+
     let mut params = CatBoxParams::new(executable.clone(), vec![]);
     let sub_in = PathBuf::from(format!("./fixtures/aplusb/testcases/{}.in", i));
+    let sub_in = sub_in.to_string_lossy().to_string();
     let sub_out = dir.path().join("sub.out");
+    let sub_out = sub_out.to_string_lossy().to_string();
     params.stdin(sub_in.clone()).stdout(sub_out.clone());
     run(params).unwrap();
 
@@ -42,7 +45,7 @@ fn it_should_run() {
     info!("Testcase #{}. ans: {}", i, ans.trim_end());
     assert_eq!(out, ans);
 
-    fs::remove_file(sub_out.as_path()).unwrap();
+    fs::remove_file(Path::new(sub_out.as_str())).unwrap();
   }
 
   info!("Running ./fixtures/aplusb/ac.cpp ok");

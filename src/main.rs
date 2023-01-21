@@ -5,12 +5,14 @@ use clap::{command, Parser, Subcommand};
 use flexi_logger::{DeferredNow, Duplicate, FileSpec, Logger};
 use log::{info, Record};
 
-pub use crate::params::CatBoxParams;
-pub use crate::sandbox::run;
+use crate::params::CatBoxParams;
+use crate::preset::make_compile_params;
+use crate::sandbox::run;
 
+mod preset;
 mod params;
 mod sandbox;
-pub mod utils;
+mod utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -25,13 +27,13 @@ struct Cli {
   verbose: bool,
 
   #[arg(long, default_value = "/dev/null")]
-  stdin: PathBuf,
+  stdin: String,
 
   #[arg(long, default_value = "/dev/null")]
-  stdout: PathBuf,
+  stdout: String,
 
   #[arg(long, default_value = "/dev/null")]
-  stderr: PathBuf,
+  stderr: String,
 
   #[structopt(subcommand)]
   command: Commands,
@@ -42,7 +44,7 @@ enum Commands {
   #[command(about = "Run user program")]
   Run {
     #[arg(help = "Program")]
-    program: PathBuf,
+    program: String,
 
     #[arg(help = "Arguments")]
     arguments: Vec<String>,
@@ -50,11 +52,11 @@ enum Commands {
 
   #[command(about = "Compile user code")]
   Compile {
-    #[arg(help = "Compiler")]
-    compiler: PathBuf,
+    #[arg(help = "Submission Code")]
+    submission: String,
 
-    #[arg(help = "Arguments")]
-    arguments: Vec<String>,
+    #[arg(short, long, help = "Language")]
+    language: String,
   },
 
   #[command(about = "Run validator")]
@@ -73,8 +75,12 @@ enum Commands {
 impl Cli {
   fn resolve(self) -> Vec<CatBoxParams> {
     let mut command = match self.command {
-      Commands::Compile { compiler: _, arguments: _ } => { unimplemented!() }
-      Commands::Run { program, arguments } => { CatBoxParams::new(program, arguments) }
+      Commands::Compile { language, submission } => {
+        make_compile_params(language, submission)
+      }
+      Commands::Run { program, arguments } => {
+        CatBoxParams::new(program, arguments)
+      }
       Commands::Validate { validator: _ } => { unimplemented!() }
       Commands::Check { checker: _ } => { unimplemented!() }
     };

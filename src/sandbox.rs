@@ -35,6 +35,17 @@ fn redirect_io(params: &CatBoxParams) {
 }
 
 
+/// 获取环境变量
+fn get_env(params: &CatBoxParams) -> Vec<CString> {
+  let mut envs = vec![];
+  for (key, value) in params.env.iter() {
+    let pair = format!("{}={}", key, value);
+    envs.push(into_c_string(&pair));
+  }
+  envs
+}
+
+
 pub fn run(params: CatBoxParams) -> Result<(), String> {
   match unsafe { fork() } {
     Ok(ForkResult::Parent { child, .. }) => {
@@ -72,15 +83,15 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
       let program = into_c_string(&params.program);
       let path = program.clone();
       let path = path.as_ref();
-      let args = params.arguments.iter().map(|p| CString::new(p.as_str()).unwrap()).collect::<Vec<CString>>();
+      let args = params.arguments.iter().map(|p| into_c_string(p)).collect::<Vec<CString>>();
       let args = [vec![program], args].concat();
       let args = args.as_slice();
-      let env: [&CString; 0] = [];
+      let env = get_env(&params);
 
-      let result = execve(path, &args, &env);
+      let result = execve(path, &args, env.as_slice());
       if let Err(e) = result {
         error!("Execve user submission fails: {}", e.desc());
-        info!("Submission path: {}", params.program.to_string_lossy());
+        info!("Submission path: {}", params.program);
         let args = args.iter().map(|cstr| cstr.to_string_lossy().into()).collect::<Vec<Box<str>>>();
         info!("Submission args: {}", args.join(" "));
       }
