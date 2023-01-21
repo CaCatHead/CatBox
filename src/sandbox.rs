@@ -1,3 +1,4 @@
+use std::env;
 use std::ffi::{c_uint, CString};
 
 use libc_stdhandle::{stderr, stdin, stdout};
@@ -5,7 +6,7 @@ use log::{error, info};
 use nix::libc;
 use nix::libc::freopen;
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{alarm, execve, fork, ForkResult};
+use nix::unistd::{alarm, execvpe, fork, ForkResult};
 
 use crate::CatBoxParams;
 use crate::utils::into_c_string;
@@ -36,8 +37,10 @@ fn redirect_io(params: &CatBoxParams) {
 
 
 /// 获取环境变量
+/// 默认只传递 PATH 环境变量
 fn get_env(params: &CatBoxParams) -> Vec<CString> {
-  let mut envs = vec![];
+  let path = format!("PATH={}", env::var("PATH").unwrap_or("".to_string()));
+  let mut envs = vec![into_c_string(&path)];
   for (key, value) in params.env.iter() {
     let pair = format!("{}={}", key, value);
     envs.push(into_c_string(&pair));
@@ -79,7 +82,7 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
       // 设置时钟
       set_alarm(&params);
 
-      // execve 运行用户程序
+      // execvpe 运行用户程序
       let program = into_c_string(&params.program);
       let path = program.clone();
       let path = path.as_ref();
@@ -88,7 +91,7 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
       let args = args.as_slice();
       let env = get_env(&params);
 
-      let result = execve(path, &args, env.as_slice());
+      let result = execvpe(path, &args, env.as_slice());
       if let Err(e) = result {
         error!("Execve user submission fails: {}", e.desc());
         info!("Submission path: {}", params.program);
