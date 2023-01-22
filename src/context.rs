@@ -6,7 +6,7 @@ use nix::unistd::{Gid, Uid, User};
 use crate::syscall::SyscallFilter;
 
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CatBoxParams {
   pub time_limit: u64,
   pub memory_limit: u64,
@@ -27,7 +27,7 @@ pub struct CatBoxParams {
 }
 
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MountPoint {
   write: bool,
   src: String,

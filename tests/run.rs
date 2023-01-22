@@ -1,4 +1,5 @@
-use std::fs;
+use std::fs::{self, remove_dir_all, remove_file, set_permissions, Permissions};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Once;
@@ -23,8 +24,9 @@ fn setup_logger() {
 fn run_cpp(file: &str, ok: bool) {
   let file = format!("./fixtures/aplusb/source/{}", file);
   let dir = tempdir().unwrap();
+  let dir = dir.into_path();
   let source = Path::new(&file).to_path_buf();
-  let executable = dir.path().join("Main.out");
+  let executable = dir.join("Main.out");
 
   let mut command = Command::new("g++");
   command
@@ -32,6 +34,8 @@ fn run_cpp(file: &str, ok: bool) {
     .arg("-o")
     .arg(executable.to_str().unwrap());
   command.output().expect("Compile should be ok");
+
+  set_permissions(&dir, Permissions::from_mode(0o777)).unwrap();
 
   info!("Start running {}", file);
 
@@ -41,7 +45,7 @@ fn run_cpp(file: &str, ok: bool) {
     let mut params = CatBoxParams::new(executable.clone(), vec![]);
     let sub_in = PathBuf::from(format!("./fixtures/aplusb/testcases/{}.in", i));
     let sub_in = sub_in.to_string_lossy().to_string();
-    let sub_out = dir.path().join("sub.out");
+    let sub_out = dir.join("sub.out");
     let sub_out = sub_out.to_string_lossy().to_string();
     params.stdin(sub_in.clone()).stdout(sub_out.clone());
     run(params).unwrap();
@@ -62,10 +66,11 @@ fn run_cpp(file: &str, ok: bool) {
       break;
     }
 
-    fs::remove_file(Path::new(sub_out.as_str())).unwrap();
+    remove_file(Path::new(sub_out.as_str())).unwrap();
   }
 
   info!("Running {} ok", file);
+  remove_dir_all(dir).unwrap();
 }
 
 #[test]
@@ -91,3 +96,14 @@ fn it_should_not_run_fork() {
   setup_logger();
   run_cpp("fork.cpp", false);
 }
+
+// #[test]
+// fn test_dev_null() {
+//   let null_fd = OpenOptions::new()
+//     .read(true)
+//     .write(true)
+//     .open("/dev/null").unwrap()
+//     .into_raw_fd();
+//   dup2(null_fd, STDERR_FILENO);
+//   println!("Hello");
+// }

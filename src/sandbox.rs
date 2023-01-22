@@ -9,14 +9,13 @@ use std::path::Path;
 use log::{debug, error, info};
 use nix::libc;
 use nix::libc::{
-  dup2, O_CREAT, O_RDONLY, O_RDWR, O_TRUNC, O_WRONLY, RLIM_INFINITY, STDERR_FILENO,
-  STDIN_FILENO, STDOUT_FILENO, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR,
+  RLIM_INFINITY, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR,
 };
 use nix::sys::ptrace;
 use nix::sys::resource::{setrlimit, Resource};
 use nix::sys::signal::Signal;
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{alarm, execvpe, fork, setgid, setgroups, setuid, ForkResult};
+use nix::unistd::{alarm, dup2, execvpe, fork, setgid, setuid, ForkResult};
 
 use crate::cgroup::CatBoxCgroup;
 use crate::context::CatBoxResult;
@@ -25,30 +24,34 @@ use crate::CatBoxParams;
 
 /// 重定向输出输出
 fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
-  debug!("Open /dev/null");
+  debug!("Redirect /dev/null");
   let null_fd = OpenOptions::new()
-    .custom_flags(O_RDWR)
-    .open("/dev/null")?;
-  debug!("Open /dev/null ????");
-  let null_fd = null_fd.into_raw_fd();
+    .read(true)
+    .write(true)
+    .open("/dev/null")?
+    .into_raw_fd();
 
   debug!("Redirect child process stdin to  {}", &params.stdin);
   let stdin_fd = if params.stdin != "/dev/null" {
     let file = Path::new(params.stdin.as_str());
-    let file = OpenOptions::new().custom_flags(O_RDONLY).open(file)?;
+    let file = OpenOptions::new().read(true).open(file)?;
     File::into_raw_fd(file)
   } else {
     null_fd.clone()
   };
   unsafe {
-    dup2(stdin_fd, STDIN_FILENO);
+    if let Err(err) = dup2(stdin_fd, STDIN_FILENO) {
+      error!("Redirect stdin fails: {}", err);
+    }
   }
 
   debug!("Redirect child process stdout to {}", &params.stdout);
   let stdout_fd = if params.stdin != "/dev/null" {
     let file = Path::new(params.stdout.as_str());
     let file = OpenOptions::new()
-      .custom_flags(O_WRONLY | O_TRUNC | O_CREAT)
+      .write(true)
+      .create(true)
+      .truncate(true)
       .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
       .open(file)?;
     File::into_raw_fd(file)
@@ -56,25 +59,32 @@ fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
     null_fd.clone()
   };
   unsafe {
-    dup2(stdout_fd, STDOUT_FILENO);
+    if let Err(err) = dup2(stdout_fd, STDOUT_FILENO) {
+      error!("Redirect stdout fails: {}", err);
+    }
   }
 
-  debug!("Redirect child process stderr to {}", &params.stderr);
-  let stderr_fd = if params.stdin != "/dev/null" {
-    let file = Path::new(params.stderr.as_str());
-    let file = OpenOptions::new()
-      .custom_flags(O_WRONLY | O_TRUNC | O_CREAT)
-      .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
-      .open(file)?;
-    File::into_raw_fd(file)
-  } else {
-    null_fd.clone()
-  };
-  unsafe {
-    dup2(stderr_fd, STDERR_FILENO);
-  }
+  // debug!("Redirect child process stderr to {}", &params.stderr);
+  // let stderr_fd = if params.stdin != "/dev/null" {
+  //   let file = Path::new(params.stderr.as_str());
+  //   let file = OpenOptions::new()
+  //     .write(true)
+  //     .create(true)
+  //     .truncate(true)
+  //     .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
+  //     .open(file)?;
+  //   File::into_raw_fd(file)
+  // } else {
+  //   null_fd.clone()
+  // };
+  // unsafe {
+  //   debug!("Start dup2 stderr");
+  //   if let Err(err) = dup2(stderr_fd, STDERR_FILENO) {
+  //     error!("Redirect stderr fails: {}", err);
+  //   }
+  // }
 
-  debug!("Redirect child process io ok");
+  debug!("Redirect child process IO ok");
 
   Ok(())
 }
@@ -235,7 +245,7 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
 
       // 设置用户
       setgid(params.gid).unwrap();
-      setgroups(&[params.gid]).unwrap();
+      // setgroups(&[params.gid]).unwrap();
       setuid(params.uid).unwrap();
 
       // 设置时钟
