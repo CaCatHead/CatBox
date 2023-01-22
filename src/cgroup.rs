@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use cgroups_rs::{Cgroup, CgroupPid, Controller, MaxValue};
 use cgroups_rs::cgroup_builder::CgroupBuilder;
 use cgroups_rs::cpuacct::CpuAcctController;

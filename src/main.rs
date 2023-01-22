@@ -14,6 +14,7 @@ mod context;
 mod sandbox;
 mod utils;
 mod cgroup;
+mod syscall;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

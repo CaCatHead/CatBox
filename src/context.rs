@@ -2,6 +2,7 @@ use std::env;
 use nix::sys::signal::Signal;
 
 use nix::unistd::{Uid, User};
+use crate::syscall::SyscallFilter;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -14,6 +15,7 @@ pub struct CatBoxParams {
   // pub(crate) gid: number,
   pub cgroup: String,
   pub process: u64,
+  pub(crate) ptrace: Option<SyscallFilter>,
   pub(crate) stack_size: u64,
   pub(crate) chroot: bool,
   pub(crate) mounts: Vec<MountPoint>,
@@ -43,6 +45,7 @@ impl CatBoxParams {
       arguments,
       cgroup,
       process: 1,
+      ptrace: Some(SyscallFilter::default()),
       stack_size: u64::MAX,
       chroot: false,
       mounts: vec![],
@@ -75,6 +78,11 @@ impl CatBoxParams {
 
   pub fn env(self: &mut Self, key: String, value: String) -> &mut Self {
     self.env.push((key, value));
+    self
+  }
+
+  pub fn ptrace(self: &mut Self, syscall_filter: Option<SyscallFilter>) -> &mut Self {
+    self.ptrace = syscall_filter;
     self
   }
 }

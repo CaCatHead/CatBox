@@ -5,7 +5,9 @@ use libc_stdhandle::{stderr, stdin, stdout};
 use log::{debug, error, info};
 use nix::libc;
 use nix::libc::{freopen, RLIM_INFINITY};
+use nix::sys::ptrace;
 use nix::sys::resource::{Resource, setrlimit};
+use nix::sys::signal::Signal;
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{alarm, execvpe, fork, ForkResult};
 
@@ -69,24 +71,67 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, String> {
       // 设置 cgroup
       let cgroup = CatBoxCgroup::new(&params, child);
 
+      // 复制 SyscallFilter
+      let mut filter = params.ptrace.clone();
+
       let (status, signal) = loop {
         let status = waitpid(child, None).unwrap();
         match status {
-          WaitStatus::Exited(_, status) => {
-            info!("Child process exited with status {}", status);
+          WaitStatus::Exited(pid, status) => {
+            info!("Child process #{}. exited with status {}", pid, status);
             break (Some(status), None);
           }
-          WaitStatus::Signaled(_, signal, _) => {
-            info!("Child process is signaled by {}", signal);
+          WaitStatus::Signaled(pid, signal, _) => {
+            info!("Child process #{}. is signaled by {}", pid, signal);
             break (None, Some(signal));
           }
-          WaitStatus::Stopped(_, signal) => {
-            info!("Child process is stopped by {}", signal);
+          WaitStatus::Stopped(pid, signal) => {
+            // 完整 Signal 定义见：https://man7.org/linux/man-pages/man7/signal.7.html
+            match signal {
+              // 可能是超时了
+              Signal::SIGALRM | Signal::SIGVTALRM | Signal::SIGXCPU => {
+                info!("Child process #{}. is stopped by {} (may be time limit exceeded)", pid, signal);
+                ptrace::kill(pid).unwrap();
+                break (None, Some(signal));
+              }
+              // 处理系统调用
+              Signal::SIGTRAP => {
+                let user_regs = ptrace::getregs(pid).unwrap();
+                let syscall_id = user_regs.orig_rax;
+                debug!("Child process #{}. performed a syscall: {}", pid, syscall_id);
+
+                if let Some(filter) = &mut filter {
+                  if filter.filter(&pid, &user_regs) {
+                    ptrace::syscall(pid, None).unwrap();
+                  } else {
+                    info!("Child process #{}. is stopped for forbidden syscall (id = {})", pid, user_regs.orig_rax);
+                    ptrace::kill(pid).unwrap();
+                    break (None, Some(signal));
+                  }
+                } else {
+                  ptrace::syscall(pid, None).unwrap();
+                }
+              }
+              // 因为各种原因 RE
+              Signal::SIGKILL | Signal::SIGBUS | Signal::SIGFPE | Signal::SIGILL | Signal::SIGSEGV | Signal::SIGSYS | Signal::SIGXFSZ => {
+                info!("Child process #{}. is stopped by {}", pid, signal);
+                ptrace::kill(pid).unwrap();
+                break (None, Some(signal));
+              }
+              // 未捕获 SIGCONT，不是终端
+              Signal::SIGCONT | Signal::SIGHUP | Signal::SIGINT => {
+                unreachable!()
+              }
+              _ => {
+                info!("Child process #{}. is stopped by an unhandled signal {}", pid, signal);
+                unimplemented!()
+              }
+            }
           }
-          WaitStatus::PtraceEvent(_, _, _) => {}
-          WaitStatus::PtraceSyscall(_) => {}
-          WaitStatus::Continued(_) => {}
-          WaitStatus::StillAlive => {}
+          WaitStatus::PtraceSyscall(pid) => { unreachable!() }
+          WaitStatus::PtraceEvent(_, _, _) => { unreachable!() }
+          WaitStatus::Continued(_) => { unreachable!() }
+          WaitStatus::StillAlive => { unreachable!() }
         }
       };
 
@@ -120,6 +165,11 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, String> {
       let args = [vec![program], args].concat();
       let args = args.as_slice();
       let env = get_env(&params);
+
+      // 启动 ptrace 追踪子进程
+      if params.ptrace.is_some() {
+        ptrace::traceme().unwrap();
+      }
 
       let result = execvpe(path, &args, env.as_slice());
       if let Err(e) = result {
