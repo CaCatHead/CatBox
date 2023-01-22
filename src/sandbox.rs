@@ -39,10 +39,8 @@ fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   } else {
     null_fd.clone()
   };
-  unsafe {
-    if let Err(err) = dup2(stdin_fd, STDIN_FILENO) {
-      error!("Redirect stdin fails: {}", err);
-    }
+  if let Err(err) = dup2(stdin_fd, STDIN_FILENO) {
+    error!("Redirect stdin fails: {}", err);
   }
 
   debug!("Redirect child process stdout to {}", &params.stdout);
@@ -58,10 +56,8 @@ fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   } else {
     null_fd.clone()
   };
-  unsafe {
-    if let Err(err) = dup2(stdout_fd, STDOUT_FILENO) {
-      error!("Redirect stdout fails: {}", err);
-    }
+  if let Err(err) = dup2(stdout_fd, STDOUT_FILENO) {
+    error!("Redirect stdout fails: {}", err);
   }
 
   debug!("Redirect child process stderr to {}", &params.stderr);
@@ -77,10 +73,8 @@ fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   } else {
     null_fd.clone()
   };
-  unsafe {
-    if let Err(err) = dup2(stderr_fd, STDERR_FILENO) {
-      error!("Redirect stderr fails: {}", err);
-    }
+  if let Err(err) = dup2(stderr_fd, STDERR_FILENO) {
+    error!("Redirect stderr fails: {}", err);
   }
 
   debug!("Redirect child process IO ok");

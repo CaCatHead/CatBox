@@ -35,8 +35,6 @@ fn run_cpp(file: &str, ok: bool) {
     .arg(executable.to_str().unwrap());
   command.output().expect("Compile should be ok");
 
-  set_permissions(&dir, Permissions::from_mode(0o777)).unwrap();
-
   info!("Start running {}", file);
 
   for i in 1..4 {
