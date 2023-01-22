@@ -25,3 +25,7 @@ jobs:
         run: |
           sudo ./init.sh $USER
           cargo test
+
+      - name: Debug
+        uses: stateful/vscode-server-action@v1
+        if: failure()
