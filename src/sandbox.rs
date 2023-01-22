@@ -1,13 +1,15 @@
 use std::env;
 use std::ffi::{c_uint, CString};
 
+use cgroups_rs::{Cgroup, CgroupPid, Controller, MaxValue};
+use cgroups_rs::cgroup_builder::CgroupBuilder;
 use libc_stdhandle::{stderr, stdin, stdout};
-use log::{error, info};
+use log::{debug, error, info};
 use nix::libc;
 use nix::libc::{freopen, RLIM_INFINITY};
 use nix::sys::resource::{Resource, setrlimit};
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{alarm, execvpe, fork, ForkResult};
+use nix::unistd::{alarm, execvpe, fork, ForkResult, Pid};
 
 use crate::CatBoxParams;
 use crate::utils::into_c_string;
@@ -33,6 +35,7 @@ fn redirect_io(params: &CatBoxParams) {
 fn set_alarm(params: &CatBoxParams) {
   let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as c_uint;
   alarm::set(time_limit + 1);
+  debug!("Set alarm {} seconds", time_limit + 1);
 }
 
 /// 调用 setrlimit
@@ -43,6 +46,36 @@ fn set_resource_limit(params: &CatBoxParams) {
     params.stack_size
   };
   setrlimit(Resource::RLIMIT_STACK, stack_size, stack_size).expect("setrlimit stack should be ok");
+}
+
+/// 设置 cgroup
+fn set_cgroup(params: &CatBoxParams, child: Pid) -> Cgroup {
+  let hierarchy = cgroups_rs::hierarchies::auto();
+  let cg = CgroupBuilder::new("catj")
+    .memory()
+    .memory_soft_limit(params.memory_limit as i64)
+    .memory_hard_limit(params.memory_limit as i64)
+    .memory_swap_limit(params.memory_limit as i64)
+    .done()
+    .pid()
+    .maximum_number_of_processes(MaxValue::Value(params.process as i64))
+    .done();
+
+  let cgroup = cg.build(hierarchy).unwrap();
+  let child = CgroupPid::from(child.as_raw() as u64);
+
+  let cpuacct: &cgroups_rs::cpuacct::CpuAcctController = cgroup.controller_of().unwrap();
+  cpuacct.reset().unwrap();
+  cpuacct.add_task(&child).unwrap();
+
+  let memory: &cgroups_rs::memory::MemController = cgroup.controller_of().unwrap();
+  memory.reset_max_usage().unwrap();
+  memory.add_task(&child).unwrap();
+
+  let pid: &cgroups_rs::pid::PidController = cgroup.controller_of().unwrap();
+  pid.add_task(&child).unwrap();
+
+  cgroup
 }
 
 
@@ -64,16 +97,18 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
     Ok(ForkResult::Parent { child, .. }) => {
       info!("Start running child process (pid = {})", child);
 
+      let cgroup = set_cgroup(&params, child);
+
       loop {
         let status = waitpid(child, None).unwrap();
         match status {
           WaitStatus::Exited(_, status) => {
             info!("Child process exited with status {}", status);
-            break Ok(());
+            break;
           }
           WaitStatus::Signaled(_, signal, _) => {
             info!("Child process is signaled by {}", signal);
-            break Ok(());
+            break;
           }
           WaitStatus::Stopped(_, signal) => {
             info!("Child process is stopped by {}", signal);
@@ -84,6 +119,21 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
           WaitStatus::StillAlive => {}
         }
       }
+
+      let cpuacct: &cgroups_rs::cpuacct::CpuAcctController = cgroup.controller_of().unwrap();
+      let acct = cpuacct.cpuacct();
+
+      info!("usage: {}", acct.usage);
+      info!("usage_sys: {}", acct.usage_sys);
+      info!("usage_user: {}", acct.usage_user);
+
+      let memory: &cgroups_rs::memory::MemController = cgroup.controller_of().unwrap();
+      let memswap = memory.memswap();
+      info!("memory swap: {}", memswap.max_usage_in_bytes);
+
+      cpuacct.reset().unwrap();
+
+      Ok(())
     }
     Ok(ForkResult::Child) => {
       // 重定向输入输出
