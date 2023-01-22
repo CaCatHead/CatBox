@@ -27,7 +27,3 @@ jobs:
           sudo chmod +w /sys/fs/cgroup/
           export RUST_BACKTRACE=1
           cargo test
-
-#      - name: Debug
-#        uses: stateful/vscode-server-action@v1
-#        if: failure()
