@@ -1,7 +1,7 @@
 use std::env;
 
 use nix::sys::signal::Signal;
-use nix::unistd::{Gid, Uid, User};
+use nix::unistd::{Gid, Group, Uid, User};
 
 use crate::syscall::SyscallFilter;
 
@@ -39,15 +39,16 @@ impl CatBoxParams {
     let current_user = User::from_uid(Uid::current()).unwrap().unwrap();
     let cgroup = env::var("CATJ_CGROUP").unwrap_or(current_user.name);
 
-    // let catbox_user = User::from_name("nobody").unwrap().unwrap();
+    let catbox_user = User::from_name("nobody").unwrap().unwrap();
+    let catbox_group = Group::from_name("nogroup").unwrap().unwrap();
 
     CatBoxParams {
       time_limit: 1000,
       memory_limit: 262144,
       program,
       arguments,
-      uid: current_user.uid,
-      gid: current_user.gid,
+      uid: catbox_user.uid,
+      gid: catbox_group.gid,
       cgroup,
       process: 1,
       ptrace: Some(SyscallFilter::default()),

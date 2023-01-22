@@ -235,7 +235,7 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       match redirect_io(&params) {
         Ok(_) => {}
         Err(err) => {
-          debug!("Redirect fails: {}", err);
+          error!("Redirect fails: {}", err);
         }
       };
 
@@ -243,9 +243,12 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       set_resource_limit(&params).unwrap();
 
       // 设置用户
-      setgid(params.gid).unwrap();
-      // setgroups(&[params.gid]).unwrap();
-      setuid(params.uid).unwrap();
+      if let Err(err) = setgid(params.gid) {
+        error!("Set gid {} fails: {}", params.gid, err);
+      }
+      if let Err(err) = setuid(params.uid) {
+        error!("Set uid {} fails: {}", params.uid, err);
+      }
 
       // 设置时钟
       set_alarm(&params);
