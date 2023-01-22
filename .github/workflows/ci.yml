@@ -24,8 +24,9 @@ jobs:
       - name: Test
         run: |
           sudo ./init.sh $USER
+          export RUST_BACKTRACE=1
           cargo test
 
-      - name: Debug
-        uses: stateful/vscode-server-action@v1
-        if: failure()
+#      - name: Debug
+#        uses: stateful/vscode-server-action@v1
+#        if: failure()
