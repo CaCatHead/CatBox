@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::{c_long, c_ulonglong};
 
-use nix::libc::{SYS_accept, SYS_accept4, SYS_bind, SYS_connect, SYS_execve, SYS_execveat, SYS_getpeername, SYS_getsockname, SYS_getsockopt, SYS_listen, SYS_setsockopt, SYS_shutdown, SYS_socket, SYS_socketpair, user_regs_struct};
+use nix::libc::{SYS_accept, SYS_accept4, SYS_bind, SYS_clone, SYS_connect, SYS_execve, SYS_execveat, SYS_fork, SYS_getpeername, SYS_getsockname, SYS_getsockopt, SYS_listen, SYS_setsockopt, SYS_shutdown, SYS_socket, SYS_socketpair, SYS_vfork, user_regs_struct};
 use nix::unistd::Pid;
 
 type SyscallId = c_ulonglong;
@@ -52,7 +52,10 @@ impl SyscallFilter {
       .forbid(SYS_shutdown);
     // 禁用进程相关
     filter.allow(SYS_execve, 1)
-      .allow(SYS_execveat, 1);
+      .allow(SYS_execveat, 1)
+      .forbid(SYS_fork)
+      .forbid(SYS_vfork)
+      .forbid(SYS_clone);
     filter
   }
 

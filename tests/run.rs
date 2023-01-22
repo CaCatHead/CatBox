@@ -76,3 +76,8 @@ fn it_should_run_mle() {
   run_cpp("mle.cpp", false);
 }
 
+#[test]
+fn it_should_not_run_fork() {
+  setup_logger();
+  run_cpp("fork.cpp", false);
+}
