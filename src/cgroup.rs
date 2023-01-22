@@ -1,7 +1,9 @@
+use std::error::Error;
+
 use cgroups_rs::{Cgroup, CgroupPid, Controller, MaxValue};
 use cgroups_rs::cgroup_builder::CgroupBuilder;
-use cgroups_rs::cpuacct::CpuAcctController;
-use cgroups_rs::memory::MemController;
+use cgroups_rs::cpuacct::{CpuAcct, CpuAcctController};
+use cgroups_rs::memory::{MemController, MemSwap};
 use cgroups_rs::pid::PidController;
 use log::{debug, error, warn};
 use nix::sys::resource::{getrusage, UsageWho};
@@ -31,8 +33,8 @@ impl CatBoxCgroup {
 
     let hierarchy = cgroups_rs::hierarchies::auto();
 
-    let enable_cpuacct = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "cpuacct");
-    let enable_memory = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "memory");
+    let mut enable_cpuacct = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "cpuacct");
+    let mut enable_memory = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "memory");
     let enable_pids = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "pids");
 
     let cgroup_name = format!("{}/{}.{}", params.cgroup, params.cgroup, child.as_raw());
@@ -82,18 +84,35 @@ impl CatBoxCgroup {
     let task = CgroupPid::from(child.as_raw() as u64);
 
     if enable_cpuacct {
-      let cpuacct: &CpuAcctController = cgroup.controller_of().unwrap();
-      cpuacct.reset().unwrap();
-      cpuacct.add_task(&task).unwrap();
+      let add_task = || -> Result<(), Box<dyn Error>> {
+        let cpuacct: &CpuAcctController = cgroup.controller_of().ok_or(Box::<dyn Error>::from("Get cpu controller fails"))?;
+        cpuacct.reset()?;
+        cpuacct.add_task(&task)?;
+        Ok(())
+      };
+      if add_task().is_err() {
+        enable_cpuacct = false;
+      }
     }
     if enable_memory {
-      let memory: &MemController = cgroup.controller_of().unwrap();
-      memory.reset_max_usage().unwrap();
-      memory.add_task(&task).unwrap();
+      let add_task = || -> Result<(), Box<dyn Error>> {
+        let memory: &MemController = cgroup.controller_of().ok_or(Box::<dyn Error>::from("Get memory controller fails"))?;
+        memory.reset_max_usage()?;
+        memory.add_task(&task)?;
+        Ok(())
+      };
+      if add_task().is_err() {
+        enable_memory = false;
+      }
     }
     if enable_pids {
-      let pid: &PidController = cgroup.controller_of().unwrap();
-      pid.add_task(&task).unwrap();
+      if let Some(pid) = cgroup.controller_of::<PidController>() {
+        if let Err(err) = pid.add_task(&task) {
+          error!("Add cgroup pids task fails")
+        }
+      } else {
+        error!("Get pids cgroup controller fails")
+      }
     }
 
     if !enable_cpuacct {
@@ -114,40 +133,69 @@ impl CatBoxCgroup {
     }
   }
 
+  fn get_cpuacct(&self) -> Result<CpuAcct, Box<dyn Error>> {
+    if self.enable_cpuacct {
+      match &self.cgroup {
+        None => Err(Box::<dyn Error>::from("cgroup is None")),
+        Some(cgroup) => {
+          let cpuacct: &CpuAcctController = cgroup.controller_of().ok_or(Box::<dyn Error>::from("Get cpu controller fails"))?;
+          let acct = cpuacct.cpuacct();
+          debug!("usage: {}", acct.usage);
+          debug!("usage_sys: {}", acct.usage_sys);
+          debug!("usage_user: {}", acct.usage_user);
+          cpuacct.reset()?;
+          Ok(acct)
+        }
+      }
+    } else {
+      Err(Box::<dyn Error>::from("cpuacct is disabled"))
+    }
+  }
+
+  fn get_memory(&self) -> Result<MemSwap, Box<dyn Error>> {
+    if self.enable_memory {
+      match &self.cgroup {
+        None => Err(Box::<dyn Error>::from("cgroup is None")),
+        Some(cgroup) => {
+          let memory: &MemController = cgroup.controller_of().ok_or(Box::<dyn Error>::from("Get memory controller fails"))?;
+          let memswap = memory.memswap();
+          debug!("memswap.max_usage_in_bytes: {}", memswap.max_usage_in_bytes);
+          memory.reset_max_usage()?;
+          Ok(memswap)
+        }
+      }
+    } else {
+      Err(Box::<dyn Error>::from("memory is disabled"))
+    }
+  }
+
   pub fn usage(&self) -> CatBoxUsage {
     let mut rusage = None;
 
-    let is_cgroup = self.cgroup.is_some();
-    let (time, time_user, time_sys) = if is_cgroup && self.enable_cpuacct {
-      let cgroup = self.cgroup.as_ref().unwrap();
-      let cpuacct: &CpuAcctController = cgroup.controller_of().unwrap();
-      let acct = cpuacct.cpuacct();
-      debug!("usage: {}", acct.usage);
-      debug!("usage_sys: {}", acct.usage_sys);
-      debug!("usage_user: {}", acct.usage_user);
-      cpuacct.reset().unwrap();
-      (acct.usage / 1000000, acct.usage_user / 1000000, acct.usage_sys / 1000000)
-    } else {
-      let usage = getrusage(UsageWho::RUSAGE_CHILDREN).unwrap();
-      rusage = Some(usage);
-      debug!("usage.user_time: {}", usage.user_time());
-      debug!("usage.system_time: {}", usage.system_time());
-      let time_user = usage.user_time();
-      let time_sys = usage.system_time();
-      (microseconds(time_user + time_sys), microseconds(time_user), microseconds(time_sys))
+    let (time, time_user, time_sys) = match self.get_cpuacct() {
+      Ok(acct) => {
+        (acct.usage / 1000000, acct.usage_user / 1000000, acct.usage_sys / 1000000)
+      }
+      Err(_) => {
+        let usage = getrusage(UsageWho::RUSAGE_CHILDREN).unwrap();
+        rusage = Some(usage);
+        debug!("usage.user_time: {}", usage.user_time());
+        debug!("usage.system_time: {}", usage.system_time());
+        let time_user = usage.user_time();
+        let time_sys = usage.system_time();
+        (microseconds(time_user + time_sys), microseconds(time_user), microseconds(time_sys))
+      }
     };
 
-    let memory_swap = if is_cgroup && self.enable_memory {
-      let cgroup = self.cgroup.as_ref().unwrap();
-      let memory: &MemController = cgroup.controller_of().unwrap();
-      let memswap = memory.memswap();
-      debug!("memswap.max_usage_in_bytes: {}", memswap.max_usage_in_bytes);
-      memory.reset_max_usage().unwrap();
-      memswap.max_usage_in_bytes / 1024
-    } else {
-      let usage = rusage.unwrap_or_else(|| getrusage(UsageWho::RUSAGE_CHILDREN).unwrap());
-      debug!("usage.max_rss: {}", usage.max_rss());
-      usage.max_rss() as u64
+    let memory_swap = match self.get_memory() {
+      Ok(memswap) => {
+        memswap.max_usage_in_bytes / 1024
+      }
+      Err(_) => {
+        let usage = rusage.unwrap_or_else(|| getrusage(UsageWho::RUSAGE_CHILDREN).unwrap());
+        debug!("usage.max_rss: {}", usage.max_rss());
+        usage.max_rss() as u64
+      }
     };
 
     CatBoxUsage {

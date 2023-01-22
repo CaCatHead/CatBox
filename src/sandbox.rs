@@ -1,4 +1,5 @@
 use std::env;
+use std::error::Error;
 use std::ffi::{c_uint, CString};
 
 use libc_stdhandle::{stderr, stdin, stdout};
@@ -41,13 +42,16 @@ fn set_alarm(params: &CatBoxParams) {
 }
 
 /// 调用 setrlimit
-fn set_resource_limit(params: &CatBoxParams) {
+fn set_resource_limit(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   let stack_size = if params.stack_size == u64::MAX {
     RLIM_INFINITY
   } else {
     params.stack_size
   };
-  setrlimit(Resource::RLIMIT_STACK, stack_size, stack_size).expect("setrlimit stack should be ok");
+  debug!("Set stack size {} bytes", stack_size);
+  setrlimit(Resource::RLIMIT_STACK, stack_size, stack_size)?;
+
+  Ok(())
 }
 
 /// 获取环境变量
@@ -128,7 +132,7 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, String> {
               }
             }
           }
-          WaitStatus::PtraceSyscall(pid) => { unreachable!() }
+          WaitStatus::PtraceSyscall(_) => { unreachable!() }
           WaitStatus::PtraceEvent(_, _, _) => { unreachable!() }
           WaitStatus::Continued(_) => { unreachable!() }
           WaitStatus::StillAlive => { unreachable!() }
@@ -152,7 +156,7 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, String> {
       redirect_io(&params);
 
       // setrlimit
-      set_resource_limit(&params);
+      set_resource_limit(&params).unwrap();
 
       // 设置时钟
       set_alarm(&params);
