@@ -12,6 +12,7 @@ use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{alarm, execvpe, fork, ForkResult, Pid};
 
 use crate::CatBoxParams;
+use crate::cgroup::CatBoxCgroup;
 use crate::utils::into_c_string;
 
 /// 重定向输出输出
@@ -48,45 +49,6 @@ fn set_resource_limit(params: &CatBoxParams) {
   setrlimit(Resource::RLIMIT_STACK, stack_size, stack_size).expect("setrlimit stack should be ok");
 }
 
-/// 设置 cgroup
-fn set_cgroup(params: &CatBoxParams, child: Pid) -> Cgroup {
-  debug!("Init cgroup {}", params.cgroup);
-
-  let hierarchy = cgroups_rs::hierarchies::auto();
-
-  for subsys in hierarchy.subsystems() {
-    info!("Support subsystem: {}", subsys.controller_name());
-  }
-
-  let cg = CgroupBuilder::new(params.cgroup.as_str())
-    .memory()
-    .memory_soft_limit(params.memory_limit as i64)
-    .memory_hard_limit(params.memory_limit as i64)
-    .memory_swap_limit(params.memory_limit as i64)
-    .done()
-    .pid()
-    .maximum_number_of_processes(MaxValue::Value(params.process as i64))
-    .done()
-    .set_specified_controllers(vec!["cpuacct".to_string(), "memory".to_string(), "pids".to_string()]);
-
-  let cgroup = cg.build(hierarchy).unwrap();
-  let child = CgroupPid::from(child.as_raw() as u64);
-
-  let cpuacct: &cgroups_rs::cpuacct::CpuAcctController = cgroup.controller_of().unwrap();
-  cpuacct.reset().unwrap();
-  cpuacct.add_task(&child).unwrap();
-
-  let memory: &cgroups_rs::memory::MemController = cgroup.controller_of().unwrap();
-  memory.reset_max_usage().unwrap();
-  memory.add_task(&child).unwrap();
-
-  let pid: &cgroups_rs::pid::PidController = cgroup.controller_of().unwrap();
-  pid.add_task(&child).unwrap();
-
-  cgroup
-}
-
-
 /// 获取环境变量
 /// 默认只传递 PATH 环境变量
 fn get_env(params: &CatBoxParams) -> Vec<CString> {
@@ -105,7 +67,8 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
     Ok(ForkResult::Parent { child, .. }) => {
       info!("Start running child process (pid = {})", child);
 
-      let cgroup = set_cgroup(&params, child);
+      // 设置 cgroup
+      let cgroup = CatBoxCgroup::new(&params, child);
 
       loop {
         let status = waitpid(child, None).unwrap();
@@ -128,18 +91,8 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
         }
       }
 
-      let cpuacct: &cgroups_rs::cpuacct::CpuAcctController = cgroup.controller_of().unwrap();
-      let acct = cpuacct.cpuacct();
-
-      info!("usage: {}", acct.usage);
-      info!("usage_sys: {}", acct.usage_sys);
-      info!("usage_user: {}", acct.usage_user);
-
-      let memory: &cgroups_rs::memory::MemController = cgroup.controller_of().unwrap();
-      let memswap = memory.memswap();
-      info!("memory swap: {}", memswap.max_usage_in_bytes);
-
-      cpuacct.reset().unwrap();
+      let usage = cgroup.usage();
+      info!("{:?}", usage);
 
       Ok(())
     }

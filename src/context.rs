@@ -1,4 +1,5 @@
 use std::env;
+
 use nix::unistd::{Uid, User};
 
 #[allow(unused)]
@@ -10,8 +11,8 @@ pub struct CatBoxParams {
   pub arguments: Vec<String>,
   // pub(crate) uid: number,
   // pub(crate) gid: number,
-  pub(crate) cgroup: String,
-  pub(crate) process: u64,
+  pub cgroup: String,
+  pub process: u64,
   pub(crate) stack_size: u64,
   pub(crate) chroot: bool,
   pub(crate) mounts: Vec<MountPoint>,

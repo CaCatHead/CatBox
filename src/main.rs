@@ -13,6 +13,7 @@ mod preset;
 mod context;
 mod sandbox;
 mod utils;
+mod cgroup;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
