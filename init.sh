@@ -18,5 +18,3 @@ for subsystem in "${ALL_SUBSYSTEMS[@]}"; do
   [ -d "${subsystem_dir}" ] && echo "Register subsystem ${subsystem} for ${catj_user} ok"
   ls -l "/sys/fs/cgroup/${catj_user}/${subsystem}"
 done
-
-ls -l "/sys/fs/cgroup/${catj_user}/"
