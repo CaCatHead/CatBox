@@ -15,6 +15,13 @@ for subsystem in "${ALL_SUBSYSTEMS[@]}"; do
   subsystem_dir="/sys/fs/cgroup/${catj_user}/${subsystem}/"
   mkdir -p "${subsystem_dir}"
   chown "${catj_user}" -R "${subsystem_dir}"
-  [ -d "${subsystem_dir}" ] && echo "Register subsystem ${subsystem} for ${catj_user} ok"
+
+  if [ -d "${subsystem_dir}" ]; then
+    echo "Register subsystem ${subsystem} for ${catj_user} ok"
+  else
+    echo "Register subsystem ${subsystem} for ${catj_user} fails"
+    exit 1
+  fi
+
   ls -l "/sys/fs/cgroup/${catj_user}/${subsystem}"
 done
