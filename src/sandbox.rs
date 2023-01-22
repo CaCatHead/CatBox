@@ -64,25 +64,24 @@ fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
     }
   }
 
-  // debug!("Redirect child process stderr to {}", &params.stderr);
-  // let stderr_fd = if params.stdin != "/dev/null" {
-  //   let file = Path::new(params.stderr.as_str());
-  //   let file = OpenOptions::new()
-  //     .write(true)
-  //     .create(true)
-  //     .truncate(true)
-  //     .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
-  //     .open(file)?;
-  //   File::into_raw_fd(file)
-  // } else {
-  //   null_fd.clone()
-  // };
-  // unsafe {
-  //   debug!("Start dup2 stderr");
-  //   if let Err(err) = dup2(stderr_fd, STDERR_FILENO) {
-  //     error!("Redirect stderr fails: {}", err);
-  //   }
-  // }
+  debug!("Redirect child process stderr to {}", &params.stderr);
+  let stderr_fd = if params.stdin != "/dev/null" {
+    let file = Path::new(params.stderr.as_str());
+    let file = OpenOptions::new()
+      .write(true)
+      .create(true)
+      .truncate(true)
+      .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
+      .open(file)?;
+    File::into_raw_fd(file)
+  } else {
+    null_fd.clone()
+  };
+  unsafe {
+    if let Err(err) = dup2(stderr_fd, STDERR_FILENO) {
+      error!("Redirect stderr fails: {}", err);
+    }
+  }
 
   debug!("Redirect child process IO ok");
 
