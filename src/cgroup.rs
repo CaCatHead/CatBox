@@ -3,7 +3,7 @@ use cgroups_rs::cgroup_builder::CgroupBuilder;
 use cgroups_rs::cpuacct::CpuAcctController;
 use cgroups_rs::memory::MemController;
 use cgroups_rs::pid::PidController;
-use log::{debug, warn};
+use log::{debug, error, warn};
 use nix::sys::resource::{getrusage, UsageWho};
 use nix::sys::time::TimeVal;
 use nix::unistd::Pid;
@@ -11,7 +11,7 @@ use nix::unistd::Pid;
 use crate::CatBoxParams;
 
 pub struct CatBoxCgroup {
-  cgroup: Cgroup,
+  cgroup: Option<Cgroup>,
   enable_cpuacct: bool,
   enable_memory: bool,
 }
@@ -64,7 +64,17 @@ impl CatBoxCgroup {
     }
     let builder = builder.set_specified_controllers(supported_controller);
 
-    let cgroup = builder.build(hierarchy).unwrap();
+    let cgroup = match builder.build(hierarchy) {
+      Ok(cgroup) => cgroup,
+      Err(err) => {
+        error!("Build cgroup fails: {}", err);
+        return CatBoxCgroup {
+          cgroup: None,
+          enable_cpuacct: false,
+          enable_memory: false,
+        };
+      }
+    };
     let task = CgroupPid::from(child.as_raw() as u64);
 
     if enable_cpuacct {
@@ -93,7 +103,7 @@ impl CatBoxCgroup {
     }
 
     CatBoxCgroup {
-      cgroup,
+      cgroup: Some(cgroup),
       enable_cpuacct,
       enable_memory,
     }
@@ -102,8 +112,10 @@ impl CatBoxCgroup {
   pub fn usage(&self) -> CatBoxUsage {
     let mut rusage = None;
 
-    let (time, time_user, time_sys) = if self.enable_cpuacct {
-      let cpuacct: &cgroups_rs::cpuacct::CpuAcctController = self.cgroup.controller_of().unwrap();
+    let is_cgroup = self.cgroup.is_some();
+    let (time, time_user, time_sys) = if is_cgroup && self.enable_cpuacct {
+      let cgroup = self.cgroup.as_ref().unwrap();
+      let cpuacct: &CpuAcctController = cgroup.controller_of().unwrap();
       let acct = cpuacct.cpuacct();
       debug!("usage: {}", acct.usage);
       debug!("usage_sys: {}", acct.usage_sys);
@@ -120,8 +132,9 @@ impl CatBoxCgroup {
       (microseconds(time_user + time_sys), microseconds(time_user), microseconds(time_sys))
     };
 
-    let memory_swap = if self.enable_memory {
-      let memory: &cgroups_rs::memory::MemController = self.cgroup.controller_of().unwrap();
+    let memory_swap = if is_cgroup && self.enable_memory {
+      let cgroup = self.cgroup.as_ref().unwrap();
+      let memory: &MemController = cgroup.controller_of().unwrap();
       let memswap = memory.memswap();
       debug!("memswap.max_usage_in_bytes: {}", memswap.max_usage_in_bytes);
       memory.reset_max_usage().unwrap();
