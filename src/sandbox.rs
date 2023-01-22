@@ -67,7 +67,7 @@ fn get_env(params: &CatBoxParams) -> Vec<CString> {
 }
 
 
-pub fn run(params: CatBoxParams) -> Result<CatBoxResult, String> {
+pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
   match unsafe { fork() } {
     Ok(ForkResult::Parent { child, .. }) => {
       info!("Start running child process (pid = {})", child);
@@ -79,7 +79,7 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, String> {
       let mut filter = params.ptrace.clone();
 
       let (status, signal) = loop {
-        let status = waitpid(child, None).unwrap();
+        let status = waitpid(child, None)?;
         match status {
           WaitStatus::Exited(pid, status) => {
             info!("Child process #{}. exited with status {}", pid, status);
@@ -95,31 +95,31 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, String> {
               // 可能是超时了
               Signal::SIGALRM | Signal::SIGVTALRM | Signal::SIGXCPU => {
                 info!("Child process #{}. is stopped by {} (may be time limit exceeded)", pid, signal);
-                ptrace::kill(pid).unwrap();
+                ptrace::kill(pid)?;
                 break (None, Some(signal));
               }
               // 处理系统调用
               Signal::SIGTRAP => {
-                let user_regs = ptrace::getregs(pid).unwrap();
+                let user_regs = ptrace::getregs(pid)?;
                 let syscall_id = user_regs.orig_rax;
                 debug!("Child process #{}. performed a syscall: {}", pid, syscall_id);
 
                 if let Some(filter) = &mut filter {
                   if filter.filter(&pid, &user_regs) {
-                    ptrace::syscall(pid, None).unwrap();
+                    ptrace::syscall(pid, None)?;
                   } else {
                     info!("Child process #{}. is stopped for forbidden syscall (id = {})", pid, user_regs.orig_rax);
-                    ptrace::kill(pid).unwrap();
+                    ptrace::kill(pid)?;
                     break (None, Some(signal));
                   }
                 } else {
-                  ptrace::syscall(pid, None).unwrap();
+                  ptrace::syscall(pid, None)?;
                 }
               }
               // 因为各种原因 RE
               Signal::SIGKILL | Signal::SIGBUS | Signal::SIGFPE | Signal::SIGILL | Signal::SIGSEGV | Signal::SIGSYS | Signal::SIGXFSZ => {
                 info!("Child process #{}. is stopped by {}", pid, signal);
-                ptrace::kill(pid).unwrap();
+                ptrace::kill(pid)?;
                 break (None, Some(signal));
               }
               // 未捕获 SIGCONT，不是终端
@@ -185,6 +185,6 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, String> {
 
       unsafe { libc::_exit(0) };
     }
-    Err(_) => Err("Fork failed".into()),
+    Err(_) => Err(Box::<dyn Error>::from("Fork failed")),
   }
 }
