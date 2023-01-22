@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 use std::ffi::{c_long, c_ulonglong};
 
-use nix::libc::{SYS_accept, SYS_accept4, SYS_bind, SYS_clone, SYS_connect, SYS_execve, SYS_execveat, SYS_fork, SYS_getpeername, SYS_getsockname, SYS_getsockopt, SYS_listen, SYS_setsockopt, SYS_shutdown, SYS_socket, SYS_socketpair, SYS_vfork, user_regs_struct};
+use nix::libc::{
+  user_regs_struct, SYS_accept, SYS_accept4, SYS_bind, SYS_clone, SYS_connect, SYS_execve,
+  SYS_execveat, SYS_fork, SYS_getpeername, SYS_getsockname, SYS_getsockopt, SYS_listen,
+  SYS_setsockopt, SYS_shutdown, SYS_socket, SYS_socketpair, SYS_vfork,
+};
 use nix::unistd::Pid;
 
 type SyscallId = c_ulonglong;
@@ -35,10 +39,11 @@ impl SyscallPerm {
 impl SyscallFilter {
   pub fn default() -> Self {
     let mut filter = SyscallFilter {
-      map: HashMap::new()
+      map: HashMap::new(),
     };
     // 禁用网络
-    filter.forbid(SYS_socket)
+    filter
+      .forbid(SYS_socket)
       .forbid(SYS_socketpair)
       .forbid(SYS_setsockopt)
       .forbid(SYS_getsockopt)
@@ -51,7 +56,8 @@ impl SyscallFilter {
       .forbid(SYS_connect)
       .forbid(SYS_shutdown);
     // 禁用进程相关
-    filter.allow(SYS_execve, 1)
+    filter
+      .allow(SYS_execve, 1)
       .allow(SYS_execveat, 1)
       .forbid(SYS_fork)
       .forbid(SYS_vfork)

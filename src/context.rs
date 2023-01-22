@@ -1,7 +1,8 @@
 use std::env;
-use nix::sys::signal::Signal;
 
-use nix::unistd::{Uid, User};
+use nix::sys::signal::Signal;
+use nix::unistd::{Gid, Uid, User};
+
 use crate::syscall::SyscallFilter;
 
 #[allow(unused)]
@@ -11,10 +12,10 @@ pub struct CatBoxParams {
   pub memory_limit: u64,
   pub program: String,
   pub arguments: Vec<String>,
-  // pub(crate) uid: number,
-  // pub(crate) gid: number,
-  pub cgroup: String,
-  pub process: u64,
+  pub(crate) uid: Uid,
+  pub(crate) gid: Gid,
+  pub(crate) cgroup: String,
+  pub(crate) process: u64,
   pub(crate) ptrace: Option<SyscallFilter>,
   pub(crate) stack_size: u64,
   pub(crate) chroot: bool,
@@ -35,14 +36,18 @@ pub struct MountPoint {
 
 impl CatBoxParams {
   pub fn new(program: String, arguments: Vec<String>) -> Self {
-    let user = User::from_uid(Uid::current()).unwrap().unwrap();
-    let cgroup = env::var("CATJ_CGROUP").unwrap_or(user.name);
+    let current_user = User::from_uid(Uid::current()).unwrap().unwrap();
+    let cgroup = env::var("CATJ_CGROUP").unwrap_or(current_user.name);
+
+    // let catbox_user = User::from_name("nobody").unwrap().unwrap();
 
     CatBoxParams {
       time_limit: 1000,
       memory_limit: 262144,
       program,
       arguments,
+      uid: current_user.uid,
+      gid: current_user.gid,
       cgroup,
       process: 1,
       ptrace: Some(SyscallFilter::default()),

@@ -9,12 +9,12 @@ use crate::context::CatBoxParams;
 use crate::preset::make_compile_params;
 use crate::sandbox::run;
 
-mod preset;
-mod context;
-mod sandbox;
-mod utils;
 mod cgroup;
+mod context;
+mod preset;
+mod sandbox;
 mod syscall;
+mod utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -80,17 +80,24 @@ enum Commands {
 impl Cli {
   fn resolve(self) -> Vec<CatBoxParams> {
     let mut command = match self.command {
-      Commands::Compile { language, submission, .. } => {
-        make_compile_params(language, submission)
+      Commands::Compile {
+        language,
+        submission,
+        ..
+      } => make_compile_params(language, submission),
+      Commands::Run { program, arguments } => CatBoxParams::new(program, arguments),
+      Commands::Validate { .. } => {
+        unimplemented!()
       }
-      Commands::Run { program, arguments } => {
-        CatBoxParams::new(program, arguments)
+      Commands::Check { .. } => {
+        unimplemented!()
       }
-      Commands::Validate { .. } => { unimplemented!() }
-      Commands::Check { .. } => { unimplemented!() }
     };
 
-    command.stdin(self.stdin).stdout(self.stdout).stderr(self.stderr);
+    command
+      .stdin(self.stdin)
+      .stdout(self.stdout)
+      .stderr(self.stderr);
 
     vec![command]
   }
@@ -121,8 +128,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       FileSpec::default()
         .directory(env::var("LOG_DIR").unwrap_or("./logs/".into()))
         .basename("catj")
-        .discriminant(format!("{}", chrono::offset::Local::now().format("%Y-%m-%d")))
-        .suppress_timestamp()
+        .discriminant(format!(
+          "{}",
+          chrono::offset::Local::now().format("%Y-%m-%d")
+        ))
+        .suppress_timestamp(),
     )
     .append()
     .duplicate_to_stderr(Duplicate::Warn)

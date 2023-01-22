@@ -1,37 +1,82 @@
 use std::env;
 use std::error::Error;
 use std::ffi::{c_uint, CString};
+use std::fs::{File, OpenOptions};
+use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::io::IntoRawFd;
+use std::path::Path;
 
-use libc_stdhandle::{stderr, stdin, stdout};
 use log::{debug, error, info};
 use nix::libc;
-use nix::libc::{freopen, RLIM_INFINITY};
+use nix::libc::{
+  dup2, O_CREAT, O_RDONLY, O_RDWR, O_TRUNC, O_WRONLY, RLIM_INFINITY, STDERR_FILENO,
+  STDIN_FILENO, STDOUT_FILENO, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR,
+};
 use nix::sys::ptrace;
-use nix::sys::resource::{Resource, setrlimit};
+use nix::sys::resource::{setrlimit, Resource};
 use nix::sys::signal::Signal;
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{alarm, execvpe, fork, ForkResult};
+use nix::unistd::{alarm, execvpe, fork, setgid, setgroups, setuid, ForkResult};
 
-use crate::CatBoxParams;
 use crate::cgroup::CatBoxCgroup;
 use crate::context::CatBoxResult;
 use crate::utils::into_c_string;
+use crate::CatBoxParams;
 
 /// 重定向输出输出
-fn redirect_io(params: &CatBoxParams) {
+fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
+  debug!("Open /dev/null");
+  let null_fd = OpenOptions::new()
+    .custom_flags(O_RDWR)
+    .open("/dev/null")?;
+  debug!("Open /dev/null ????");
+  let null_fd = null_fd.into_raw_fd();
+
+  debug!("Redirect child process stdin to  {}", &params.stdin);
+  let stdin_fd = if params.stdin != "/dev/null" {
+    let file = Path::new(params.stdin.as_str());
+    let file = OpenOptions::new().custom_flags(O_RDONLY).open(file)?;
+    File::into_raw_fd(file)
+  } else {
+    null_fd.clone()
+  };
   unsafe {
-    let in_path = into_c_string(&params.stdin);
-    let mode = CString::new("r").unwrap();
-    freopen(in_path.as_ptr(), mode.as_ptr(), stdin());
-
-    let out_path = into_c_string(&params.stdout);
-    let mode = CString::new("w").unwrap();
-    freopen(out_path.as_ptr(), mode.as_ptr(), stdout());
-
-    let err_path = into_c_string(&params.stderr);
-    let mode = CString::new("w").unwrap();
-    freopen(err_path.as_ptr(), mode.as_ptr(), stderr());
+    dup2(stdin_fd, STDIN_FILENO);
   }
+
+  debug!("Redirect child process stdout to {}", &params.stdout);
+  let stdout_fd = if params.stdin != "/dev/null" {
+    let file = Path::new(params.stdout.as_str());
+    let file = OpenOptions::new()
+      .custom_flags(O_WRONLY | O_TRUNC | O_CREAT)
+      .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
+      .open(file)?;
+    File::into_raw_fd(file)
+  } else {
+    null_fd.clone()
+  };
+  unsafe {
+    dup2(stdout_fd, STDOUT_FILENO);
+  }
+
+  debug!("Redirect child process stderr to {}", &params.stderr);
+  let stderr_fd = if params.stdin != "/dev/null" {
+    let file = Path::new(params.stderr.as_str());
+    let file = OpenOptions::new()
+      .custom_flags(O_WRONLY | O_TRUNC | O_CREAT)
+      .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
+      .open(file)?;
+    File::into_raw_fd(file)
+  } else {
+    null_fd.clone()
+  };
+  unsafe {
+    dup2(stderr_fd, STDERR_FILENO);
+  }
+
+  debug!("Redirect child process io ok");
+
+  Ok(())
 }
 
 /// 设置子进程时钟 signal，运行时限 + 1 秒
@@ -66,12 +111,9 @@ fn get_env(params: &CatBoxParams) -> Vec<CString> {
   envs
 }
 
-
 pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
   match unsafe { fork() } {
     Ok(ForkResult::Parent { child, .. }) => {
-      info!("Start running child process (pid = {})", child);
-
       // 设置 cgroup
       let cgroup = CatBoxCgroup::new(&params, child);
 
@@ -94,7 +136,10 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
             match signal {
               // 可能是超时了
               Signal::SIGALRM | Signal::SIGVTALRM | Signal::SIGXCPU => {
-                info!("Child process #{}. is stopped by {} (may be time limit exceeded)", pid, signal);
+                info!(
+                  "Child process #{}. is stopped by {} (may be time limit exceeded)",
+                  pid, signal
+                );
                 ptrace::kill(pid)?;
                 break (None, Some(signal));
               }
@@ -102,13 +147,19 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
               Signal::SIGTRAP => {
                 let user_regs = ptrace::getregs(pid)?;
                 let syscall_id = user_regs.orig_rax;
-                debug!("Child process #{}. performed a syscall: {}", pid, syscall_id);
+                debug!(
+                  "Child process #{}. performed a syscall: {}",
+                  pid, syscall_id
+                );
 
                 if let Some(filter) = &mut filter {
                   if filter.filter(&pid, &user_regs) {
                     ptrace::syscall(pid, None)?;
                   } else {
-                    info!("Child process #{}. is stopped for forbidden syscall (id = {})", pid, user_regs.orig_rax);
+                    info!(
+                      "Child process #{}. is stopped for forbidden syscall (id = {})",
+                      pid, user_regs.orig_rax
+                    );
                     ptrace::kill(pid)?;
                     break (None, Some(signal));
                   }
@@ -117,7 +168,13 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
                 }
               }
               // 因为各种原因 RE
-              Signal::SIGKILL | Signal::SIGBUS | Signal::SIGFPE | Signal::SIGILL | Signal::SIGSEGV | Signal::SIGSYS | Signal::SIGXFSZ => {
+              Signal::SIGKILL
+              | Signal::SIGBUS
+              | Signal::SIGFPE
+              | Signal::SIGILL
+              | Signal::SIGSEGV
+              | Signal::SIGSYS
+              | Signal::SIGXFSZ => {
                 info!("Child process #{}. is stopped by {}", pid, signal);
                 ptrace::kill(pid)?;
                 break (None, Some(signal));
@@ -127,15 +184,26 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
                 unreachable!()
               }
               _ => {
-                info!("Child process #{}. is stopped by an unhandled signal {}", pid, signal);
+                info!(
+                  "Child process #{}. is stopped by an unhandled signal {}",
+                  pid, signal
+                );
                 unimplemented!()
               }
             }
           }
-          WaitStatus::PtraceSyscall(_) => { unreachable!() }
-          WaitStatus::PtraceEvent(_, _, _) => { unreachable!() }
-          WaitStatus::Continued(_) => { unreachable!() }
-          WaitStatus::StillAlive => { unreachable!() }
+          WaitStatus::PtraceSyscall(_) => {
+            unreachable!()
+          }
+          WaitStatus::PtraceEvent(_, _, _) => {
+            unreachable!()
+          }
+          WaitStatus::Continued(_) => {
+            unreachable!()
+          }
+          WaitStatus::StillAlive => {
+            unreachable!()
+          }
         }
       };
 
@@ -152,11 +220,23 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       })
     }
     Ok(ForkResult::Child) => {
+      info!("This is child process");
+
       // 重定向输入输出
-      redirect_io(&params);
+      match redirect_io(&params) {
+        Ok(_) => {}
+        Err(err) => {
+          debug!("Redirect fails: {}", err);
+        }
+      };
 
       // setrlimit
       set_resource_limit(&params).unwrap();
+
+      // 设置用户
+      setgid(params.gid).unwrap();
+      setgroups(&[params.gid]).unwrap();
+      setuid(params.uid).unwrap();
 
       // 设置时钟
       set_alarm(&params);
@@ -165,7 +245,11 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       let program = into_c_string(&params.program);
       let path = program.clone();
       let path = path.as_ref();
-      let args = params.arguments.iter().map(|p| into_c_string(p)).collect::<Vec<CString>>();
+      let args = params
+        .arguments
+        .iter()
+        .map(|p| into_c_string(p))
+        .collect::<Vec<CString>>();
       let args = [vec![program], args].concat();
       let args = args.as_slice();
       let env = get_env(&params);
@@ -179,7 +263,10 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       if let Err(e) = result {
         error!("Execve user submission fails: {}", e.desc());
         info!("Submission path: {}", params.program);
-        let args = args.iter().map(|cstr| cstr.to_string_lossy().into()).collect::<Vec<Box<str>>>();
+        let args = args
+          .iter()
+          .map(|cstr| cstr.to_string_lossy().into())
+          .collect::<Vec<Box<str>>>();
         info!("Submission args: {}", args.join(" "));
       }
 

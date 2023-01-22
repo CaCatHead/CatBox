@@ -7,13 +7,16 @@ use flexi_logger::Logger;
 use log::info;
 use tempfile::tempdir;
 
-use catj::{CatBoxParams, run};
+use catj::{run, CatBoxParams};
 
 static INIT: Once = Once::new();
 
 fn setup_logger() {
   INIT.call_once(|| {
-    Logger::try_with_str("catj=debug,info").unwrap().start().unwrap();
+    Logger::try_with_str("catj=debug,info")
+      .unwrap()
+      .start()
+      .unwrap();
   });
 }
 
@@ -24,7 +27,10 @@ fn run_cpp(file: &str, ok: bool) {
   let executable = dir.path().join("Main.out");
 
   let mut command = Command::new("g++");
-  command.arg(source.to_str().unwrap()).arg("-o").arg(executable.to_str().unwrap());
+  command
+    .arg(source.to_str().unwrap())
+    .arg("-o")
+    .arg(executable.to_str().unwrap());
   command.output().expect("Compile should be ok");
 
   info!("Start running {}", file);
@@ -41,7 +47,11 @@ fn run_cpp(file: &str, ok: bool) {
     run(params).unwrap();
 
     let out = fs::read_to_string(sub_out.clone()).unwrap();
-    let ans = fs::read_to_string(PathBuf::from(format!("./fixtures/aplusb/testcases/{}.ans", i))).unwrap();
+    let ans = fs::read_to_string(PathBuf::from(format!(
+      "./fixtures/aplusb/testcases/{}.ans",
+      i
+    )))
+    .unwrap();
 
     info!("Testcase #{}. out: {}", i, out.trim_end());
 

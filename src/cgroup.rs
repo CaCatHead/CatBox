@@ -1,10 +1,10 @@
 use std::error::Error;
 
-use cgroups_rs::{Cgroup, CgroupPid, Controller, MaxValue};
 use cgroups_rs::cgroup_builder::CgroupBuilder;
 use cgroups_rs::cpuacct::{CpuAcct, CpuAcctController};
 use cgroups_rs::memory::{MemController, MemSwap};
 use cgroups_rs::pid::PidController;
+use cgroups_rs::{Cgroup, CgroupPid, Controller, MaxValue};
 use log::{debug, error, warn};
 use nix::sys::resource::{getrusage, UsageWho};
 use nix::sys::time::TimeVal;
@@ -33,15 +33,25 @@ impl CatBoxCgroup {
 
     let hierarchy = cgroups_rs::hierarchies::auto();
 
-    let mut enable_cpuacct = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "cpuacct");
-    let mut enable_memory = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "memory");
-    let enable_pids = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "pids");
+    let mut enable_cpuacct = hierarchy
+      .subsystems()
+      .iter()
+      .any(|subsystem| subsystem.controller_name() == "cpuacct");
+    let mut enable_memory = hierarchy
+      .subsystems()
+      .iter()
+      .any(|subsystem| subsystem.controller_name() == "memory");
+    let enable_pids = hierarchy
+      .subsystems()
+      .iter()
+      .any(|subsystem| subsystem.controller_name() == "pids");
 
     let cgroup_name = format!("{}/{}.{}", params.cgroup, params.cgroup, child.as_raw());
     let builder = CgroupBuilder::new(cgroup_name.as_str());
     let builder = if enable_memory {
       let memory_limit = params.memory_limit as i64 * 1024 + 4 * 1024;
-      builder.memory()
+      builder
+        .memory()
         .memory_soft_limit(memory_limit)
         .memory_hard_limit(memory_limit)
         .memory_swap_limit(memory_limit)
@@ -50,7 +60,8 @@ impl CatBoxCgroup {
       builder
     };
     let builder = if enable_pids {
-      builder.pid()
+      builder
+        .pid()
         .maximum_number_of_processes(MaxValue::Value(params.process as i64))
         .done()
     } else {
@@ -85,7 +96,9 @@ impl CatBoxCgroup {
 
     if enable_cpuacct {
       let add_task = || -> Result<(), Box<dyn Error>> {
-        let cpuacct: &CpuAcctController = cgroup.controller_of().ok_or(Box::<dyn Error>::from("Get cpu controller fails"))?;
+        let cpuacct: &CpuAcctController = cgroup
+          .controller_of()
+          .ok_or(Box::<dyn Error>::from("Get cpu controller fails"))?;
         cpuacct.reset()?;
         cpuacct.add_task(&task)?;
         Ok(())
@@ -96,7 +109,9 @@ impl CatBoxCgroup {
     }
     if enable_memory {
       let add_task = || -> Result<(), Box<dyn Error>> {
-        let memory: &MemController = cgroup.controller_of().ok_or(Box::<dyn Error>::from("Get memory controller fails"))?;
+        let memory: &MemController = cgroup
+          .controller_of()
+          .ok_or(Box::<dyn Error>::from("Get memory controller fails"))?;
         memory.reset_max_usage()?;
         memory.add_task(&task)?;
         Ok(())
@@ -108,7 +123,7 @@ impl CatBoxCgroup {
     if enable_pids {
       if let Some(pid) = cgroup.controller_of::<PidController>() {
         if let Err(err) = pid.add_task(&task) {
-          error!("Add cgroup pids task fails")
+          error!("Add cgroup pids task fails: {}", err)
         }
       } else {
         error!("Get pids cgroup controller fails")
@@ -138,7 +153,9 @@ impl CatBoxCgroup {
       match &self.cgroup {
         None => Err(Box::<dyn Error>::from("cgroup is None")),
         Some(cgroup) => {
-          let cpuacct: &CpuAcctController = cgroup.controller_of().ok_or(Box::<dyn Error>::from("Get cpu controller fails"))?;
+          let cpuacct: &CpuAcctController = cgroup
+            .controller_of()
+            .ok_or(Box::<dyn Error>::from("Get cpu controller fails"))?;
           let acct = cpuacct.cpuacct();
           debug!("usage: {}", acct.usage);
           debug!("usage_sys: {}", acct.usage_sys);
@@ -157,7 +174,9 @@ impl CatBoxCgroup {
       match &self.cgroup {
         None => Err(Box::<dyn Error>::from("cgroup is None")),
         Some(cgroup) => {
-          let memory: &MemController = cgroup.controller_of().ok_or(Box::<dyn Error>::from("Get memory controller fails"))?;
+          let memory: &MemController = cgroup
+            .controller_of()
+            .ok_or(Box::<dyn Error>::from("Get memory controller fails"))?;
           let memswap = memory.memswap();
           debug!("memswap.max_usage_in_bytes: {}", memswap.max_usage_in_bytes);
           memory.reset_max_usage()?;
@@ -173,9 +192,11 @@ impl CatBoxCgroup {
     let mut rusage = None;
 
     let (time, time_user, time_sys) = match self.get_cpuacct() {
-      Ok(acct) => {
-        (acct.usage / 1000000, acct.usage_user / 1000000, acct.usage_sys / 1000000)
-      }
+      Ok(acct) => (
+        acct.usage / 1000000,
+        acct.usage_user / 1000000,
+        acct.usage_sys / 1000000,
+      ),
       Err(_) => {
         let usage = getrusage(UsageWho::RUSAGE_CHILDREN).unwrap();
         rusage = Some(usage);
@@ -183,14 +204,16 @@ impl CatBoxCgroup {
         debug!("usage.system_time: {}", usage.system_time());
         let time_user = usage.user_time();
         let time_sys = usage.system_time();
-        (microseconds(time_user + time_sys), microseconds(time_user), microseconds(time_sys))
+        (
+          microseconds(time_user + time_sys),
+          microseconds(time_user),
+          microseconds(time_sys),
+        )
       }
     };
 
     let memory_swap = match self.get_memory() {
-      Ok(memswap) => {
-        memswap.max_usage_in_bytes / 1024
-      }
+      Ok(memswap) => memswap.max_usage_in_bytes / 1024,
       Err(_) => {
         let usage = rusage.unwrap_or_else(|| getrusage(UsageWho::RUSAGE_CHILDREN).unwrap());
         debug!("usage.max_rss: {}", usage.max_rss());
