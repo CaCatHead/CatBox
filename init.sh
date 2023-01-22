@@ -12,6 +12,9 @@ echo "Register cgroup for ${catj_user}..."
 
 ALL_SUBSYSTEMS=("cpu" "cpuacct" "memory" "pids")
 
+ls -l /sys/fs/cgroup/
+echo "--------------------"
+
 for subsystem in "${ALL_SUBSYSTEMS[@]}"; do
   subsystem_dir="/sys/fs/cgroup/${subsystem}/${catj_user}/"
   mkdir -p "${subsystem_dir}"
@@ -24,4 +27,7 @@ for subsystem in "${ALL_SUBSYSTEMS[@]}"; do
     echo "Register subsystem ${subsystem} for ${catj_user} fails"
     exit 1
   fi
+
+  ls -l /sys/fs/cgroup/$subsystem
+  echo "--------------------"
 done
