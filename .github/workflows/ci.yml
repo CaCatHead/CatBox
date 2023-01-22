@@ -24,6 +24,7 @@ jobs:
       - name: Test
         run: |
           sudo ./init.sh $USER
+          sudo chmod +w /sys/fs/cgroup/
           export RUST_BACKTRACE=1
           cargo test
 
