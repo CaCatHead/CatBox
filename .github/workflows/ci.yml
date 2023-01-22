@@ -19,7 +19,7 @@ jobs:
           toolchain: stable
 
       - name: Build
-        run: cargo build --verbose
+        run: sudo cargo build --verbose
 
       - name: Test
-        run: cargo test
+        run: sudo cargo test
