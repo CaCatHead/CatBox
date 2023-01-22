@@ -4,19 +4,13 @@ use std::ffi::{c_uint, CString};
 use libc_stdhandle::{stderr, stdin, stdout};
 use log::{error, info};
 use nix::libc;
-use nix::libc::freopen;
+use nix::libc::{freopen, RLIM_INFINITY};
+use nix::sys::resource::{Resource, setrlimit};
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{alarm, execvpe, fork, ForkResult};
 
 use crate::CatBoxParams;
 use crate::utils::into_c_string;
-
-/// 设置子进程时钟 signal，运行时限 + 1 秒
-fn set_alarm(params: &CatBoxParams) {
-  let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as c_uint;
-  alarm::set(time_limit + 1);
-}
-
 
 /// 重定向输出输出
 fn redirect_io(params: &CatBoxParams) {
@@ -33,6 +27,22 @@ fn redirect_io(params: &CatBoxParams) {
     let mode = CString::new("w").unwrap();
     freopen(err_path.as_ptr(), mode.as_ptr(), stderr());
   }
+}
+
+/// 设置子进程时钟 signal，运行时限 + 1 秒
+fn set_alarm(params: &CatBoxParams) {
+  let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as c_uint;
+  alarm::set(time_limit + 1);
+}
+
+/// 调用 setrlimit
+fn set_resource_limit(params: &CatBoxParams) {
+  let stack_size = if params.stack_size == u64::MAX {
+    RLIM_INFINITY
+  } else {
+    params.stack_size
+  };
+  setrlimit(Resource::RLIMIT_STACK, stack_size, stack_size).expect("setrlimit stack should be ok");
 }
 
 
@@ -78,6 +88,9 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
     Ok(ForkResult::Child) => {
       // 重定向输入输出
       redirect_io(&params);
+
+      // setrlimit
+      set_resource_limit(&params);
 
       // 设置时钟
       set_alarm(&params);
