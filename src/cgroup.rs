@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 use cgroups_rs::{Cgroup, CgroupPid, Controller, MaxValue};
 use cgroups_rs::cgroup_builder::CgroupBuilder;
 use cgroups_rs::cpuacct::CpuAcctController;
@@ -11,6 +13,7 @@ use nix::unistd::Pid;
 use crate::CatBoxParams;
 
 pub struct CatBoxCgroup {
+  name: String,
   cgroup: Option<Cgroup>,
   enable_cpuacct: bool,
   enable_memory: bool,
@@ -34,7 +37,8 @@ impl CatBoxCgroup {
     let enable_memory = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "memory");
     let enable_pids = hierarchy.subsystems().iter().any(|subsystem| subsystem.controller_name() == "pids");
 
-    let builder = CgroupBuilder::new(params.cgroup.as_str());
+    let cgroup_name = format!("{}/{}.{}", params.cgroup, params.cgroup, child.as_raw());
+    let builder = CgroupBuilder::new(cgroup_name.as_str());
     let builder = if enable_memory {
       let memory_limit = params.memory_limit as i64 * 1024 + 4 * 1024;
       builder.memory()
@@ -70,6 +74,7 @@ impl CatBoxCgroup {
       Err(err) => {
         error!("Build cgroup fails: {}", err);
         return CatBoxCgroup {
+          name: cgroup_name,
           cgroup: None,
           enable_cpuacct: false,
           enable_memory: false,
@@ -104,6 +109,7 @@ impl CatBoxCgroup {
     }
 
     CatBoxCgroup {
+      name: cgroup_name,
       cgroup: Some(cgroup),
       enable_cpuacct,
       enable_memory,
@@ -151,6 +157,15 @@ impl CatBoxCgroup {
       time_user,
       time_sys,
       memory_swap,
+    }
+  }
+}
+
+impl Drop for CatBoxCgroup {
+  fn drop(&mut self) {
+    if let Some(cgroup) = &self.cgroup {
+      debug!("Delete created cgroup {}", self.name);
+      cgroup.delete().unwrap();
     }
   }
 }
