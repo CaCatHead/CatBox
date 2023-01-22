@@ -232,15 +232,10 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       info!("This is child process");
 
       // 重定向输入输出
-      match redirect_io(&params) {
-        Ok(_) => {}
-        Err(err) => {
-          error!("Redirect fails: {}", err);
-        }
-      };
+      redirect_io(&params)?;
 
       // setrlimit
-      set_resource_limit(&params).unwrap();
+      set_resource_limit(&params)?;
 
       // 设置用户
       if let Err(err) = setgid(params.gid) {
