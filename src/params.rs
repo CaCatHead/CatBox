@@ -1,3 +1,5 @@
+use nix::unistd::{Uid, User};
+
 #[derive(Debug)]
 pub struct CatBoxParams {
   pub time_limit: u64,
@@ -6,6 +8,7 @@ pub struct CatBoxParams {
   pub arguments: Vec<String>,
   // pub(crate) uid: number,
   // pub(crate) gid: number,
+  pub(crate) cgroup: String,
   pub(crate) process: u64,
   pub(crate) stack_size: u64,
   pub(crate) chroot: bool,
@@ -25,11 +28,14 @@ pub struct MountPoint {
 
 impl CatBoxParams {
   pub fn new(program: String, arguments: Vec<String>) -> Self {
+    let user = User::from_uid(Uid::current()).unwrap().unwrap();
+
     CatBoxParams {
       time_limit: 1000,
       memory_limit: 262144,
       program,
       arguments,
+      cgroup: user.name,
       process: 1,
       stack_size: u64::MAX,
       chroot: false,

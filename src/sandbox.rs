@@ -51,7 +51,7 @@ fn set_resource_limit(params: &CatBoxParams) {
 /// 设置 cgroup
 fn set_cgroup(params: &CatBoxParams, child: Pid) -> Cgroup {
   let hierarchy = cgroups_rs::hierarchies::auto();
-  let cg = CgroupBuilder::new("catj")
+  let cg = CgroupBuilder::new(params.cgroup.as_str())
     .memory()
     .memory_soft_limit(params.memory_limit as i64)
     .memory_hard_limit(params.memory_limit as i64)

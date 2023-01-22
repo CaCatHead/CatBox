@@ -19,7 +19,9 @@ jobs:
           toolchain: stable
 
       - name: Build
-        run: sudo cargo build --verbose
+        run: cargo build --verbose
 
       - name: Test
-        run: sudo cargo test
+        run: |
+          sudo ./init.sh $USER
+          cargo test
