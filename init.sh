@@ -10,13 +10,16 @@ catj_group=$(id -gn "${catj_user}")
 
 echo "Register cgroup for ${catj_user}..."
 
-ALL_SUBSYSTEMS=("cpu" "cpuacct" "memory" "pids")
+ALL_SUBSYSTEMS=("cpuacct" "memory" "pids")
 
 ls -l /sys/fs/cgroup/
 echo "--------------------"
 
 for subsystem in "${ALL_SUBSYSTEMS[@]}"; do
   subsystem_dir="/sys/fs/cgroup/${subsystem}/${catj_user}/"
+  echo "Subsystem: ${subsystem}"
+  echo "Dir: ${subsystem_dir}"
+
   mkdir -p "${subsystem_dir}"
   chown "${catj_user}" -R "${subsystem_dir}"
   chgrp "${catj_group}" -R "${subsystem_dir}"
@@ -28,6 +31,6 @@ for subsystem in "${ALL_SUBSYSTEMS[@]}"; do
     exit 1
   fi
 
-  ls -l /sys/fs/cgroup/$subsystem
+  ls -l "/sys/fs/cgroup/${subsystem}/"
   echo "--------------------"
 done

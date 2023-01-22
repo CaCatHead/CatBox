@@ -1,3 +1,4 @@
+use std::env;
 use nix::unistd::{Uid, User};
 
 #[allow(unused)]
@@ -31,13 +32,14 @@ pub struct MountPoint {
 impl CatBoxParams {
   pub fn new(program: String, arguments: Vec<String>) -> Self {
     let user = User::from_uid(Uid::current()).unwrap().unwrap();
+    let cgroup = env::var("CATJ_CGROUP").unwrap_or(user.name);
 
     CatBoxParams {
       time_limit: 1000,
       memory_limit: 262144,
       program,
       arguments,
-      cgroup: user.name,
+      cgroup,
       process: 1,
       stack_size: u64::MAX,
       chroot: false,

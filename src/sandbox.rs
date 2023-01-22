@@ -62,7 +62,7 @@ fn set_cgroup(params: &CatBoxParams, child: Pid) -> Cgroup {
     .pid()
     .maximum_number_of_processes(MaxValue::Value(params.process as i64))
     .done()
-    .set_specified_controllers(vec!["cpu".to_string(), "cpuacct".to_string(), "memory".to_string(), "pids".to_string()]);
+    .set_specified_controllers(vec!["cpuacct".to_string(), "memory".to_string(), "pids".to_string()]);
 
   let cgroup = cg.build(hierarchy).unwrap();
   let child = CgroupPid::from(child.as_raw() as u64);
