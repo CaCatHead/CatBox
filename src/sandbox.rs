@@ -11,6 +11,7 @@ use nix::unistd::{alarm, execvpe, fork, ForkResult};
 
 use crate::CatBoxParams;
 use crate::cgroup::CatBoxCgroup;
+use crate::context::CatBoxResult;
 use crate::utils::into_c_string;
 
 /// 重定向输出输出
@@ -60,7 +61,7 @@ fn get_env(params: &CatBoxParams) -> Vec<CString> {
 }
 
 
-pub fn run(params: CatBoxParams) -> Result<(), String> {
+pub fn run(params: CatBoxParams) -> Result<CatBoxResult, String> {
   match unsafe { fork() } {
     Ok(ForkResult::Parent { child, .. }) => {
       info!("Start running child process (pid = {})", child);
@@ -68,16 +69,16 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
       // 设置 cgroup
       let cgroup = CatBoxCgroup::new(&params, child);
 
-      loop {
+      let (status, signal) = loop {
         let status = waitpid(child, None).unwrap();
         match status {
           WaitStatus::Exited(_, status) => {
             info!("Child process exited with status {}", status);
-            break;
+            break (Some(status), None);
           }
           WaitStatus::Signaled(_, signal, _) => {
             info!("Child process is signaled by {}", signal);
-            break;
+            break (None, Some(signal));
           }
           WaitStatus::Stopped(_, signal) => {
             info!("Child process is stopped by {}", signal);
@@ -87,12 +88,19 @@ pub fn run(params: CatBoxParams) -> Result<(), String> {
           WaitStatus::Continued(_) => {}
           WaitStatus::StillAlive => {}
         }
-      }
+      };
 
       let usage = cgroup.usage();
       info!("{:?}", usage);
 
-      Ok(())
+      Ok(CatBoxResult {
+        status,
+        signal,
+        time: usage.time(),
+        time_user: usage.time_user(),
+        time_sys: usage.time_sys(),
+        memory: usage.memory_swap(),
+      })
     }
     Ok(ForkResult::Child) => {
       // 重定向输入输出

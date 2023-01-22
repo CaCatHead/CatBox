@@ -1,4 +1,5 @@
 use std::env;
+use nix::sys::signal::Signal;
 
 use nix::unistd::{Uid, User};
 
@@ -79,4 +80,11 @@ impl CatBoxParams {
 }
 
 #[allow(unused)]
-pub struct CatBoxResult {}
+pub struct CatBoxResult {
+  pub(crate) status: Option<i32>,
+  pub(crate) signal: Option<Signal>,
+  pub(crate) time: u64,
+  pub(crate) time_user: u64,
+  pub(crate) time_sys: u64,
+  pub(crate) memory: u64,
+}

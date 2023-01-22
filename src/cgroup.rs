@@ -36,10 +36,11 @@ impl CatBoxCgroup {
 
     let builder = CgroupBuilder::new(params.cgroup.as_str());
     let builder = if enable_memory {
+      let memory_limit = params.memory_limit as i64 * 1024 + 4 * 1024;
       builder.memory()
-        .memory_soft_limit(params.memory_limit as i64)
-        .memory_hard_limit(params.memory_limit as i64)
-        .memory_swap_limit(params.memory_limit as i64)
+        .memory_soft_limit(memory_limit)
+        .memory_hard_limit(memory_limit)
+        .memory_swap_limit(memory_limit)
         .done()
     } else {
       builder
@@ -121,7 +122,7 @@ impl CatBoxCgroup {
       debug!("usage_sys: {}", acct.usage_sys);
       debug!("usage_user: {}", acct.usage_user);
       cpuacct.reset().unwrap();
-      (acct.usage / 1000, acct.usage_user / 1000, acct.usage_sys / 1000)
+      (acct.usage / 1000000, acct.usage_user / 1000000, acct.usage_sys / 1000000)
     } else {
       let usage = getrusage(UsageWho::RUSAGE_CHILDREN).unwrap();
       rusage = Some(usage);
@@ -151,6 +152,24 @@ impl CatBoxCgroup {
       time_sys,
       memory_swap,
     }
+  }
+}
+
+impl CatBoxUsage {
+  pub fn time(&self) -> u64 {
+    self.time
+  }
+
+  pub fn time_user(&self) -> u64 {
+    self.time_user
+  }
+
+  pub fn time_sys(&self) -> u64 {
+    self.time_sys
+  }
+
+  pub fn memory_swap(&self) -> u64 {
+    self.memory_swap
   }
 }
 
