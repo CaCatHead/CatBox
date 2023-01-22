@@ -1,15 +1,13 @@
 use std::env;
 use std::ffi::{c_uint, CString};
 
-use cgroups_rs::{Cgroup, CgroupPid, Controller, MaxValue};
-use cgroups_rs::cgroup_builder::CgroupBuilder;
 use libc_stdhandle::{stderr, stdin, stdout};
 use log::{debug, error, info};
 use nix::libc;
 use nix::libc::{freopen, RLIM_INFINITY};
 use nix::sys::resource::{Resource, setrlimit};
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{alarm, execvpe, fork, ForkResult, Pid};
+use nix::unistd::{alarm, execvpe, fork, ForkResult};
 
 use crate::CatBoxParams;
 use crate::cgroup::CatBoxCgroup;

@@ -3,13 +3,14 @@ use cgroups_rs::cgroup_builder::CgroupBuilder;
 use cgroups_rs::cpuacct::CpuAcctController;
 use cgroups_rs::memory::MemController;
 use cgroups_rs::pid::PidController;
-use log::{debug, info, warn};
+use log::{debug, warn};
+use nix::sys::resource::{getrusage, UsageWho};
+use nix::sys::time::TimeVal;
 use nix::unistd::Pid;
 
 use crate::CatBoxParams;
 
 pub struct CatBoxCgroup {
-  pid: Pid,
   cgroup: Cgroup,
   enable_cpuacct: bool,
   enable_memory: bool,
@@ -92,7 +93,6 @@ impl CatBoxCgroup {
     }
 
     CatBoxCgroup {
-      pid: child,
       cgroup,
       enable_cpuacct,
       enable_memory,
@@ -100,6 +100,8 @@ impl CatBoxCgroup {
   }
 
   pub fn usage(&self) -> CatBoxUsage {
+    let mut rusage = None;
+
     let (time, time_user, time_sys) = if self.enable_cpuacct {
       let cpuacct: &cgroups_rs::cpuacct::CpuAcctController = self.cgroup.controller_of().unwrap();
       let acct = cpuacct.cpuacct();
@@ -107,9 +109,15 @@ impl CatBoxCgroup {
       debug!("usage_sys: {}", acct.usage_sys);
       debug!("usage_user: {}", acct.usage_user);
       cpuacct.reset().unwrap();
-      (acct.usage, acct.usage_user, acct.usage_sys)
+      (acct.usage / 1000, acct.usage_user / 1000, acct.usage_sys / 1000)
     } else {
-      (0, 0, 0)
+      let usage = getrusage(UsageWho::RUSAGE_CHILDREN).unwrap();
+      rusage = Some(usage);
+      debug!("usage.user_time: {}", usage.user_time());
+      debug!("usage.system_time: {}", usage.system_time());
+      let time_user = usage.user_time();
+      let time_sys = usage.system_time();
+      (microseconds(time_user + time_sys), microseconds(time_user), microseconds(time_sys))
     };
 
     let memory_swap = if self.enable_memory {
@@ -117,9 +125,11 @@ impl CatBoxCgroup {
       let memswap = memory.memswap();
       debug!("memswap.max_usage_in_bytes: {}", memswap.max_usage_in_bytes);
       memory.reset_max_usage().unwrap();
-      memswap.max_usage_in_bytes
+      memswap.max_usage_in_bytes / 1024
     } else {
-      0
+      let usage = rusage.unwrap_or_else(|| getrusage(UsageWho::RUSAGE_CHILDREN).unwrap());
+      debug!("usage.max_rss: {}", usage.max_rss());
+      usage.max_rss() as u64
     };
 
     CatBoxUsage {
@@ -129,4 +139,8 @@ impl CatBoxCgroup {
       memory_swap,
     }
   }
+}
+
+fn microseconds(val: TimeVal) -> u64 {
+  (val.tv_sec() * 1000 + val.tv_usec() / 1000) as u64
 }
