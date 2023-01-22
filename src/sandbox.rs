@@ -53,6 +53,11 @@ fn set_cgroup(params: &CatBoxParams, child: Pid) -> Cgroup {
   debug!("Init cgroup {}", params.cgroup);
 
   let hierarchy = cgroups_rs::hierarchies::auto();
+
+  for subsys in hierarchy.subsystems() {
+    info!("Support subsystem: {}", subsys.controller_name());
+  }
+
   let cg = CgroupBuilder::new(params.cgroup.as_str())
     .memory()
     .memory_soft_limit(params.memory_limit as i64)
