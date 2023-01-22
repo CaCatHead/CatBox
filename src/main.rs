@@ -5,12 +5,12 @@ use clap::{command, Parser, Subcommand};
 use flexi_logger::{DeferredNow, Duplicate, FileSpec, Logger};
 use log::{info, Record};
 
-use crate::params::CatBoxParams;
+use crate::context::CatBoxParams;
 use crate::preset::make_compile_params;
 use crate::sandbox::run;
 
 mod preset;
-mod params;
+mod context;
 mod sandbox;
 mod utils;
 

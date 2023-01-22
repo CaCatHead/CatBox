@@ -1,5 +1,6 @@
 use nix::unistd::{Uid, User};
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct CatBoxParams {
   pub time_limit: u64,
@@ -19,6 +20,7 @@ pub struct CatBoxParams {
   pub(crate) stderr: String,
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct MountPoint {
   write: bool,
@@ -72,3 +74,6 @@ impl CatBoxParams {
     self
   }
 }
+
+#[allow(unused)]
+pub struct CatBoxResult {}

@@ -1,6 +1,6 @@
-pub use params::CatBoxParams;
+pub use context::CatBoxParams;
 pub use sandbox::run;
 
 mod sandbox;
-mod params;
+mod context;
 mod utils;

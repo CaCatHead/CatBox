@@ -1,4 +1,4 @@
-use super::params::CatBoxParams;
+use super::context::CatBoxParams;
 
 pub fn make_compile_params(language: String, _submission: String) -> CatBoxParams {
   match language.as_str() {
