@@ -26,15 +26,6 @@ struct Cli {
   #[arg(short, long, help = "Memory limit")]
   memory: Option<u64>,
 
-  #[arg(long, default_value = "/dev/null")]
-  stdin: String,
-
-  #[arg(long, default_value = "/dev/null")]
-  stdout: String,
-
-  #[arg(long, default_value = "/dev/null")]
-  stderr: String,
-
   #[structopt(subcommand)]
   command: Commands,
 }
@@ -48,6 +39,15 @@ enum Commands {
 
     #[arg(help = "Arguments")]
     arguments: Vec<String>,
+
+    #[arg(long, default_value = "/dev/null")]
+    stdin: String,
+
+    #[arg(long, default_value = "/dev/null")]
+    stdout: String,
+
+    #[arg(long, default_value = "/dev/null")]
+    stderr: String,
   },
 
   #[command(about = "Compile user code")]
@@ -83,9 +83,13 @@ impl Cli {
         submission,
         output
       } => make_compile_params(language, submission, output),
-      Commands::Run { program, arguments } => {
+      Commands::Run { program, arguments, stdin, stdout, stderr } => {
         let mut params = CatBoxParams::new(program, arguments);
-        params.chroot(true);
+        params
+          .stdin(stdin)
+          .stdout(stdout)
+          .stderr(stderr)
+          .chroot(true);
         params
       }
       Commands::Validate { .. } => {
@@ -102,11 +106,6 @@ impl Cli {
     if let Some(memory) = self.memory {
       command.memory_limit(memory);
     }
-
-    command
-      .stdin(self.stdin)
-      .stdout(self.stdout)
-      .stderr(self.stderr);
 
     vec![command]
   }
