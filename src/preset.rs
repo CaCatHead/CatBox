@@ -1,6 +1,6 @@
 use super::context::CatBoxParams;
 
-pub fn make_compile_params(language: String, _submission: String) -> CatBoxParams {
+pub fn make_compile_params(language: String, _submission: String, _output: String) -> CatBoxParams {
   match language.as_str() {
     "c" | "cpp" | "c++" => {
       let args = vec![];

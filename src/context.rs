@@ -80,6 +80,16 @@ impl CatBoxParams {
     }
   }
 
+  pub fn time_limit(self: &mut Self, value: u64) -> &mut Self {
+    self.time_limit = value;
+    self
+  }
+
+  pub fn memory_limit(self: &mut Self, value: u64) -> &mut Self {
+    self.memory_limit = value;
+    self
+  }
+
   pub fn stdin<PS: Into<String>>(self: &mut Self, path: PS) -> &mut Self {
     self.stdin = path.into();
     self

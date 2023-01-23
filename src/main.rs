@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use clap::{command, Parser, Subcommand};
 use flexi_logger::{DeferredNow, Duplicate, FileSpec, Logger};
-use log::{error, info, Record};
+use log::{debug, error, info, Record};
 
 use crate::context::CatBoxParams;
 use crate::preset::make_compile_params;
@@ -20,11 +20,11 @@ mod utils;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-  #[arg(short, long, default_value_t = 1000)]
-  time: u64,
+  #[arg(short, long, help = "Time limit")]
+  time: Option<u64>,
 
-  #[arg(short, long, default_value_t = 262144)]
-  memory: u64,
+  #[arg(short, long, help = "Memory limit")]
+  memory: Option<u64>,
 
   #[arg(long, default_value = "/dev/null")]
   stdin: String,
@@ -81,8 +81,8 @@ impl Cli {
       Commands::Compile {
         language,
         submission,
-        ..
-      } => make_compile_params(language, submission),
+        output
+      } => make_compile_params(language, submission, output),
       Commands::Run { program, arguments } => {
         let mut params = CatBoxParams::new(program, arguments);
         params.chroot(true);
@@ -95,6 +95,13 @@ impl Cli {
         unimplemented!()
       }
     };
+
+    if let Some(time) = self.time {
+      command.time_limit(time);
+    }
+    if let Some(memory) = self.memory {
+      command.memory_limit(memory);
+    }
 
     command
       .stdin(self.stdin)
