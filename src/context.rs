@@ -120,7 +120,7 @@ impl CatBoxParams {
   }
 
   pub fn stderr<PS: Into<String>>(self: &mut Self, path: PS) -> &mut Self {
-    self.stdin = path.into();
+    self.stderr = path.into();
     self
   }
 
@@ -200,25 +200,29 @@ impl CatBoxParams {
         for mount_point in &self.mounts {
           let target = mount_point.dst().strip_prefix(Path::new("/")).unwrap();
           let target = new_root.join(target);
-          debug!("Unmount directory {:?}", &target);
-          if let Err(err) = umount2(&target, MntFlags::MNT_FORCE | MntFlags::MNT_DETACH) {
-            error!("Fails umount {}: {}", target.to_string_lossy(), err);
+          if target.exists() {
+            debug!("Unmount directory {:?}", &target);
+            if let Err(err) = umount2(&target, MntFlags::MNT_FORCE | MntFlags::MNT_DETACH) {
+              error!("Fails umount {}: {}", target.to_string_lossy(), err);
+            }
           }
         }
-        if let Err(err) = umount2(&new_root, MntFlags::MNT_FORCE | MntFlags::MNT_DETACH) {
-          error!("Fails umount {}: {}", new_root.to_string_lossy(), err);
-        }
+        if new_root.exists() {
+          if let Err(err) = umount2(&new_root, MntFlags::MNT_FORCE | MntFlags::MNT_DETACH) {
+            error!("Fails umount {}: {}", new_root.to_string_lossy(), err);
+          }
 
-        match remove_dir_all(&new_root) {
-          Ok(_) => {
-            info!("Remove new root: {}", new_root.to_string_lossy());
-          }
-          Err(err) => {
-            error!(
-              "Fails removing new root: {} ({})",
-              new_root.to_string_lossy(),
-              err
-            );
+          match remove_dir_all(&new_root) {
+            Ok(_) => {
+              info!("Remove new root: {}", new_root.to_string_lossy());
+            }
+            Err(err) => {
+              error!(
+                "Fails removing new root: {} ({})",
+                new_root.to_string_lossy(),
+                err
+              );
+            }
           }
         }
       }
