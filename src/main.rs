@@ -21,10 +21,10 @@ mod utils;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-  #[arg(short, long, help = "Time limit")]
+  #[arg(short, long, help = "Time limit (unit: ms)")]
   time: Option<u64>,
 
-  #[arg(short, long, help = "Memory limit")]
+  #[arg(short, long, help = "Memory limit (unit: KB)")]
   memory: Option<u64>,
 
   #[arg(long, value_name = "KEY=VALUE", help = "Pass environment variables")]
