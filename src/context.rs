@@ -3,7 +3,7 @@ use std::fs::remove_dir_all;
 use std::path::{Path, PathBuf};
 
 use log::{debug, error, info};
-use nix::mount::{umount, umount2, MntFlags};
+use nix::mount::{umount2, MntFlags};
 use nix::sys::signal::Signal;
 use nix::unistd::{Gid, Group, Uid, User};
 use tempfile::tempdir;
@@ -27,9 +27,9 @@ pub struct CatBoxParams {
   pub(crate) cwd: PathBuf,
   pub(crate) mounts: Vec<MountPoint>,
   pub(crate) env: Vec<(String, String)>,
-  pub(crate) stdin: String,
-  pub(crate) stdout: String,
-  pub(crate) stderr: String,
+  pub(crate) stdin: Option<String>,
+  pub(crate) stdout: Option<String>,
+  pub(crate) stderr: Option<String>,
   pub(crate) debug: bool,
 }
 
@@ -77,9 +77,9 @@ impl CatBoxParams {
         "PATH".to_string(),
         env::var("PATH").unwrap_or("".to_string()),
       )],
-      stdin: String::from("/dev/null"),
-      stdout: String::from("/dev/null"),
-      stderr: String::from("/dev/null"),
+      stdin: None,
+      stdout: None,
+      stderr: None,
       debug: false,
     }
   }
@@ -91,6 +91,13 @@ impl CatBoxParams {
 
   pub fn memory_limit(self: &mut Self, value: u64) -> &mut Self {
     self.memory_limit = value;
+    self
+  }
+
+  pub fn current_user(self: &mut Self) -> &mut Self {
+    let current_user = User::from_uid(Uid::current()).unwrap().unwrap();
+    self.uid = current_user.uid;
+    self.gid = current_user.gid;
     self
   }
 
@@ -109,18 +116,18 @@ impl CatBoxParams {
     self
   }
 
-  pub fn stdin<PS: Into<String>>(self: &mut Self, path: PS) -> &mut Self {
-    self.stdin = path.into();
+  pub fn stdin<PS: Into<String>>(self: &mut Self, path: Option<PS>) -> &mut Self {
+    self.stdin = path.map(|p| p.into());
     self
   }
 
-  pub fn stdout<PS: Into<String>>(self: &mut Self, path: PS) -> &mut Self {
-    self.stdout = path.into();
+  pub fn stdout<PS: Into<String>>(self: &mut Self, path: Option<PS>) -> &mut Self {
+    self.stdout = path.map(|p| p.into());
     self
   }
 
-  pub fn stderr<PS: Into<String>>(self: &mut Self, path: PS) -> &mut Self {
-    self.stderr = path.into();
+  pub fn stderr<PS: Into<String>>(self: &mut Self, path: Option<PS>) -> &mut Self {
+    self.stderr = path.map(|p| p.into());
     self
   }
 

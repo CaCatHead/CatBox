@@ -41,17 +41,23 @@ use crate::CatBoxParams;
 /// 重定向输出输出
 fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   unsafe {
-    let in_path = into_c_string(&params.stdin);
-    let mode = CString::new("r").unwrap();
-    freopen(in_path.as_ptr(), mode.as_ptr(), stdin());
+    if let Some(in_path) = &params.stdin {
+      let in_path = into_c_string(&in_path);
+      let mode = CString::new("r").unwrap();
+      freopen(in_path.as_ptr(), mode.as_ptr(), stdin());
+    }
 
-    let out_path = into_c_string(&params.stdout);
-    let mode = CString::new("w").unwrap();
-    freopen(out_path.as_ptr(), mode.as_ptr(), stdout());
+    if let Some(out_path) = &params.stdout {
+      let out_path = into_c_string(&out_path);
+      let mode = CString::new("w").unwrap();
+      freopen(out_path.as_ptr(), mode.as_ptr(), stdout());
+    }
 
-    let err_path = into_c_string(&params.stderr);
-    let mode = CString::new("w").unwrap();
-    freopen(err_path.as_ptr(), mode.as_ptr(), stderr());
+    if let Some(err_path) = &params.stderr {
+      let err_path = into_c_string(&err_path);
+      let mode = CString::new("w").unwrap();
+      freopen(err_path.as_ptr(), mode.as_ptr(), stderr());
+    }
   }
 
   // debug!("Redirect /dev/null");

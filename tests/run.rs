@@ -1,18 +1,10 @@
-use std::ffi::CString;
-use std::fs::{self, remove_dir_all, remove_file, File, OpenOptions};
-use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::io::IntoRawFd;
+use std::fs::{self, remove_dir_all, remove_file};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::ptr::null;
 use std::sync::Once;
 
 use flexi_logger::Logger;
 use log::info;
-use nix::libc::{self, STDERR_FILENO, STDIN_FILENO};
-use nix::libc::{STDOUT_FILENO, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR};
-use nix::sys::wait::waitpid;
-use nix::unistd::{close, dup2, execvp, fork, write, ForkResult};
 use tempfile::tempdir;
 
 use catj::{run, CatBoxParams};
@@ -55,8 +47,8 @@ fn run_cpp(file: &str, ok: bool) {
     let mut params = CatBoxParams::new(executable.clone(), vec![]);
     params
       // .debug()
-      .stdin(sub_in.clone())
-      .stdout(sub_out.clone())
+      .stdin(Some(sub_in.clone()))
+      .stdout(Some(sub_out.clone()))
       .chroot(true)
       .mount_read(&dir, &dir);
     run(&params).unwrap();
@@ -115,7 +107,7 @@ fn it_should_echo() {
   let mut params = CatBoxParams::new("echo", vec!["123".to_string()]);
   params
     // .debug()
-    .stdout("a.txt");
+    .stdout(Some("a.txt"));
   run(&params).unwrap();
 }
 

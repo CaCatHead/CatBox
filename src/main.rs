@@ -1,12 +1,11 @@
-#[macro_use]
-extern crate lazy_static;
+#![allow(dead_code)]
 
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
 use clap::{command, Parser, Subcommand};
-use flexi_logger::{Duplicate, FileSpec, Logger};
+use flexi_logger::{FileSpec, Logger};
 use log::{error, info};
 
 use crate::catbox::run;
@@ -33,11 +32,14 @@ struct Cli {
   #[arg(long, value_name = "KEY=VALUE", help = "Pass environment variables")]
   env: Vec<String>,
 
-  #[arg(long, help = "Set child process uid")]
+  #[arg(long, help = "Child process uid")]
   uid: Option<u32>,
 
-  #[arg(long, help = "Set child process gid")]
+  #[arg(long, help = "Child process gid")]
   gid: Option<u32>,
+
+  #[arg(long, help = "Run in current user")]
+  user: bool,
 
   #[structopt(subcommand)]
   command: Commands,
@@ -53,14 +55,14 @@ enum Commands {
     #[arg(help = "Arguments")]
     arguments: Vec<String>,
 
-    #[arg(short = 'i', long, default_value = "/dev/null", help = "Redirect stdin")]
-    stdin: String,
+    #[arg(short = 'i', long, help = "Redirect stdin [default: PIPE]")]
+    stdin: Option<String>,
 
-    #[arg(short = 'o', long, default_value = "/dev/null", help = "Redirect stdout")]
-    stdout: String,
+    #[arg(short = 'o', long, help = "Redirect stdout [default: PIPE]")]
+    stdout: Option<String>,
 
-    #[arg(short = 'e', long, default_value = "/dev/null", help = "Redirect stderr")]
-    stderr: String,
+    #[arg(short = 'e', long, help = "Redirect stderr [default: PIPE]")]
+    stderr: Option<String>,
 
     #[arg(short = 'R', long, value_name = "SRC:DST", help = "Mount read-only directory")]
     read: Vec<String>,
@@ -175,6 +177,9 @@ impl Cli {
       command.memory_limit(memory);
     }
 
+    if self.user {
+      command.current_user();
+    }
     if let Some(uid) = self.uid {
       command.uid(uid);
     }
@@ -213,7 +218,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .suppress_timestamp(),
     )
     .append()
-    .duplicate_to_stderr(Duplicate::Warn)
+    // .duplicate_to_stderr(Duplicate::Warn)
     .format_for_files(default_format)
     .start()?;
 
