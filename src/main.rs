@@ -5,6 +5,7 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use clap::{command, Parser, Subcommand};
+use context::CatBoxResult;
 use flexi_logger::{FileSpec, Logger};
 use log::{error, info};
 
@@ -23,6 +24,9 @@ mod utils;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+  #[arg(long, help = "Output report")]
+  report: bool,
+
   #[arg(short, long, help = "Time limit (unit: ms)")]
   time: Option<u64>,
 
@@ -198,11 +202,13 @@ impl Cli {
   }
 }
 
-fn start(tasks: &Vec<CatBoxParams>) -> Result<(), Box<dyn Error>> {
+fn start(tasks: &Vec<CatBoxParams>) -> Result<Vec<CatBoxResult>, Box<dyn Error>> {
+  let mut results = vec![];
   for param in tasks {
-    run(&param)?;
+    let result = run(&param)?;
+    results.push(result);
   }
-  Ok(())
+  Ok(results)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -233,8 +239,17 @@ fn main() -> Result<(), Box<dyn Error>> {
   }
 
   match result {
-    Ok(_) => {
+    Ok(results) => {
       info!("Running catj finished");
+      if results.len() == 1 {
+        let result = results.first().unwrap();
+        println!("status: {}", result.status.map_or_else(|| "null".to_string(), |v| v.to_string()));
+        println!("signal: {}", result.signal.map_or_else(|| "null".to_string(), |v| v.to_string()));
+        println!("time: {}", result.time);
+        println!("time_user: {}", result.time_user);
+        println!("time_sys: {}", result.time_sys);
+        println!("memory: {}", result.memory);
+      }
       Ok(())
     }
     Err(err) => {
