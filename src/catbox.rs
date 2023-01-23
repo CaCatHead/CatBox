@@ -392,14 +392,12 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       let args = args.as_slice();
       let env = get_env(&params);
 
-      info!("Start running program {}", params.program);
       {
-        info!("Submission path: {}", params.program);
         let args = args
           .iter()
           .map(|cstr| cstr.to_string_lossy().into())
           .collect::<Vec<Box<str>>>();
-        info!("Submission args: {}", args.join(" "));
+        info!("Start running program {}", args.join(" "));
       }
 
       // 启动 ptrace 追踪子进程
