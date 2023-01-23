@@ -1,17 +1,17 @@
 [package]
 name = "catj"
 version = "0.0.0"
+authors = ["XLor yjl9903@outlook.com"]
 edition = "2021"
 
-authors = ["XLor yjl9903@vip.qq.com"]
-license = "MIT"
-
-categories = ["command-line-utilities"]
+description = "A light process isolation sandbox used for competitive programming contest"
+readme = "README.md"
 homepage = "https://github.com/yjl9903/CatBox"
 repository = "https://github.com/yjl9903/CatBox"
-keywords = ["sandbox"]
-readme = "README.md"
-description = "A light process isolation sandbox used for competitive programming contest"
+license = "MIT"
+license-file = "LICENSE"
+keywords = ["sandbox", "cli"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 cgroups-rs = "0.3.0"
