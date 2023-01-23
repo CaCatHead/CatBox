@@ -1,21 +1,21 @@
 use std::error::Error;
 use std::ffi::{c_uint, CString};
 use std::fs::create_dir_all;
-use std::os::unix::io::RawFd;
+
 use std::path::{Path, PathBuf};
 
+use libc_stdhandle::{stderr, stdin, stdout};
 use log::{debug, error, info};
-use nix::fcntl::open;
-use nix::fcntl::OFlag;
-use nix::libc;
-use nix::libc::{RLIM_INFINITY, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
+
+use nix::libc::RLIM_INFINITY;
+use nix::libc::{self, freopen};
 use nix::mount::{mount, MsFlags};
 use nix::sys::ptrace;
 use nix::sys::resource::{setrlimit, Resource};
 use nix::sys::signal::Signal;
-use nix::sys::stat::Mode;
+
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{alarm, chdir, chroot, close, dup2, execvpe, fork, setgid, setuid, ForkResult};
+use nix::unistd::{alarm, chdir, chroot, execvpe, fork, setgid, setuid, ForkResult};
 
 use crate::cgroup::CatBoxCgroup;
 use crate::context::CatBoxResult;
@@ -39,87 +39,101 @@ use crate::CatBoxParams;
 // }
 
 /// 重定向输出输出
-fn redirect_io(params: &CatBoxParams) -> Result<(RawFd, RawFd, RawFd, RawFd), Box<dyn Error>> {
-  debug!("Redirect /dev/null");
-  let null_fd = open(
-    "/dev/null",
-    OFlag::O_RDONLY | OFlag::O_WRONLY,
-    Mode::empty(),
-  )
-  .unwrap();
+fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
+  unsafe {
+    let in_path = into_c_string(&params.stdin);
+    let mode = CString::new("r").unwrap();
+    freopen(in_path.as_ptr(), mode.as_ptr(), stdin());
 
-  info!("Redirect child process stdin to {}", &params.stdin);
-  let stdin_fd = if params.stdin != "/dev/null" {
-    let file = Path::new(params.stdin.as_str());
-    open(file, OFlag::O_RDONLY, Mode::empty()).unwrap()
-  } else {
-    null_fd.clone()
-  };
-  match dup2(stdin_fd, STDIN_FILENO) {
-    Ok(_) => {
-      if stdin_fd != null_fd {
-        close(stdin_fd)?;
-      }
-    }
-    Err(err) => {
-      error!("Redirect stdin fails: {}", err);
-    }
-  };
+    let out_path = into_c_string(&params.stdout);
+    let mode = CString::new("w").unwrap();
+    freopen(out_path.as_ptr(), mode.as_ptr(), stdout());
 
-  info!("Redirect child process stdout to {}", &params.stdout);
-  let stdout_fd = if params.stdin != "/dev/null" {
-    let file = Path::new(params.stdout.as_str());
-    open(
-      file,
-      OFlag::O_WRONLY | OFlag::O_TRUNC | OFlag::O_CREAT,
-      Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IWGRP,
-    )
-    .unwrap()
-  } else {
-    null_fd.clone()
-  };
-  match dup2(stdout_fd, STDOUT_FILENO) {
-    Ok(_) => {
-      if stdout_fd != null_fd {
-        close(stdout_fd)?;
-      }
-    }
-    Err(err) => {
-      error!("Redirect stdout fails: {}", err);
-    }
-  };
-
-  info!("Redirect child process stderr to {}", &params.stderr);
-  let stderr_fd = if params.stdin != "/dev/null" {
-    let file = Path::new(params.stderr.as_str());
-    open(
-      file,
-      OFlag::O_WRONLY | OFlag::O_TRUNC | OFlag::O_CREAT,
-      Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IWGRP,
-    )
-    .unwrap()
-  } else {
-    null_fd.clone()
-  };
-  // debug 状态下不重定向 stderr 到 /dev/null，否则子进程看不到输出
-  if params.stderr != "/dev/null" || !params.debug {
-    match dup2(stderr_fd, STDERR_FILENO) {
-      Ok(_) => {
-        if stderr_fd != null_fd {
-          close(stderr_fd)?;
-        }
-      }
-      Err(err) => {
-        error!("Redirect stderr fails: {}", err);
-      }
-    }
+    let err_path = into_c_string(&params.stderr);
+    let mode = CString::new("w").unwrap();
+    freopen(err_path.as_ptr(), mode.as_ptr(), stderr());
   }
 
-  close(null_fd)?;
+  // debug!("Redirect /dev/null");
+  // let null_fd = open(
+  //   "/dev/null",
+  //   OFlag::O_RDONLY | OFlag::O_WRONLY,
+  //   Mode::empty(),
+  // )
+  // .unwrap();
+
+  // info!("Redirect child process stdin to {}", &params.stdin);
+  // let stdin_fd = if params.stdin != "/dev/null" {
+  //   let file = Path::new(params.stdin.as_str());
+  //   open(file, OFlag::O_RDONLY, Mode::empty()).unwrap()
+  // } else {
+  //   null_fd.clone()
+  // };
+  // match dup2(stdin_fd, STDIN_FILENO) {
+  //   Ok(_) => {
+  //     if stdin_fd != null_fd {
+  //       close(stdin_fd)?;
+  //     }
+  //   }
+  //   Err(err) => {
+  //     error!("Redirect stdin fails: {}", err);
+  //   }
+  // };
+
+  // info!("Redirect child process stdout to {}", &params.stdout);
+  // let stdout_fd = if params.stdin != "/dev/null" {
+  //   let file = Path::new(params.stdout.as_str());
+  //   open(
+  //     file,
+  //     OFlag::O_WRONLY | OFlag::O_TRUNC | OFlag::O_CREAT,
+  //     Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IWGRP,
+  //   )
+  //   .unwrap()
+  // } else {
+  //   null_fd.clone()
+  // };
+  // match dup2(stdout_fd, STDOUT_FILENO) {
+  //   Ok(_) => {
+  //     if stdout_fd != null_fd {
+  //       close(stdout_fd)?;
+  //     }
+  //   }
+  //   Err(err) => {
+  //     error!("Redirect stdout fails: {}", err);
+  //   }
+  // };
+
+  // info!("Redirect child process stderr to {}", &params.stderr);
+  // let stderr_fd = if params.stdin != "/dev/null" {
+  //   let file = Path::new(params.stderr.as_str());
+  //   open(
+  //     file,
+  //     OFlag::O_WRONLY | OFlag::O_TRUNC | OFlag::O_CREAT,
+  //     Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IWGRP,
+  //   )
+  //   .unwrap()
+  // } else {
+  //   null_fd.clone()
+  // };
+  // // debug 状态下不重定向 stderr 到 /dev/null，否则子进程看不到输出
+  // if params.stderr != "/dev/null" || !params.debug {
+  //   match dup2(stderr_fd, STDERR_FILENO) {
+  //     Ok(_) => {
+  //       if stderr_fd != null_fd {
+  //         close(stderr_fd)?;
+  //       }
+  //     }
+  //     Err(err) => {
+  //       error!("Redirect stderr fails: {}", err);
+  //     }
+  //   }
+  // }
+
+  // close(null_fd)?;
 
   info!("Redirect child process IO ok");
 
-  Ok((stdin_fd, stdout_fd, stderr_fd, null_fd))
+  Ok(())
 }
 
 /// 设置子进程时钟 signal，运行时限 + 1 秒

@@ -47,12 +47,12 @@ fn run_cpp(file: &str, ok: bool) {
   for i in 1..4 {
     let executable = executable.to_string_lossy().to_string();
 
-    let mut params = CatBoxParams::new(executable.clone(), vec![]);
     let sub_in = PathBuf::from(format!("./fixtures/aplusb/testcases/{}.in", i));
     let sub_in = sub_in.to_string_lossy().to_string();
     let sub_out = dir.join("sub.out");
     let sub_out = sub_out.to_string_lossy().to_string();
 
+    let mut params = CatBoxParams::new(executable.clone(), vec![]);
     params
       // .debug()
       .stdin(sub_in.clone())
@@ -107,6 +107,16 @@ fn it_should_run_mle() {
 fn it_should_not_run_fork() {
   setup_logger();
   run_cpp("fork.cpp", false);
+}
+
+#[test]
+fn it_should_echo() {
+  setup_logger();
+  let mut params = CatBoxParams::new("echo", vec!["123".to_string()]);
+  params
+    // .debug()
+    .stdout("a.txt");
+  run(&params).unwrap();
 }
 
 // #[test]
