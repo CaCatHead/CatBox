@@ -3,8 +3,8 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use clap::{command, Parser, Subcommand};
-use flexi_logger::{DeferredNow, Duplicate, FileSpec, Logger};
-use log::{debug, error, info, Record};
+use flexi_logger::{Duplicate, FileSpec, Logger};
+use log::{debug, error, info};
 
 use crate::catbox::run;
 use crate::context::CatBoxParams;
@@ -102,12 +102,12 @@ impl Cli {
         let mut params = CatBoxParams::new(program, arguments);
 
         for text in read {
-          if let Err(msg) = params.parse_mount_read(text) {
+          if let Err(_) = params.parse_mount_read(text) {
             error!("Parse mount string fails");
           }
         }
         for text in write {
-          if let Err(msg) = params.parse_mount_write(text) {
+          if let Err(_) = params.parse_mount_write(text) {
             error!("Parse mount string fails");
           }
         }

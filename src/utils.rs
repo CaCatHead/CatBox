@@ -4,6 +4,7 @@ use std::ffi::CString;
 
 /// A logline-formatter that produces log lines like <br>
 /// ```[datetime: INFO] Task successfully read from conf.json```
+#[allow(unused)]
 pub fn default_format(
   w: &mut dyn std::io::Write,
   now: &mut DeferredNow,
