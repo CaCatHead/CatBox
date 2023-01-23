@@ -1,6 +1,7 @@
 use std::collections::hash_map::Entry::Occupied;
 use std::collections::HashMap;
 use std::ffi::{c_long, c_ulonglong};
+use std::fmt::{Debug, Formatter};
 
 use nix::libc::{
   user_regs_struct, SYS_accept, SYS_accept4, SYS_bind, SYS_clone, SYS_connect, SYS_execve,
@@ -13,10 +14,10 @@ type SyscallId = c_ulonglong;
 
 /// 禁止系统调用
 /// 允许有限次系统调用
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum SyscallPerm {
   Forbid,
-  FilterFn,
+  FilterFn(fn(pid: &Pid, regs: &user_regs_struct) -> bool),
   Allow(i32),
 }
 
@@ -25,16 +26,6 @@ pub enum SyscallPerm {
 #[derive(Debug, Clone)]
 pub struct SyscallFilter {
   map: HashMap<SyscallId, SyscallPerm>,
-}
-
-impl SyscallPerm {
-  fn forbid() -> Self {
-    SyscallPerm::Forbid
-  }
-
-  fn allow(count: i32) -> Self {
-    SyscallPerm::Allow(count)
-  }
 }
 
 impl SyscallFilter {
@@ -71,19 +62,26 @@ impl SyscallFilter {
     self
   }
 
+  pub fn add_fn(self: &mut Self, id: c_long, func: fn(pid: &Pid, regs: &user_regs_struct) -> bool) -> &mut Self {
+    self.map.insert(id as SyscallId, SyscallPerm::FilterFn(func));
+    self
+  }
+
   pub fn allow(self: &mut Self, id: c_long, count: i32) -> &mut Self {
     self.map.insert(id as SyscallId, SyscallPerm::allow(count));
     self
   }
 
-  pub fn filter(self: &mut Self, _pid: &Pid, regs: &user_regs_struct) -> bool {
+  pub fn filter(self: &mut Self, pid: &Pid, regs: &user_regs_struct) -> bool {
     let syscall_id = regs.orig_rax;
     let entry = self.map.entry(syscall_id);
     if let Occupied(mut entry) = entry {
       let perm = entry.get_mut();
       match perm {
         SyscallPerm::Forbid => false,
-        SyscallPerm::FilterFn => false,
+        SyscallPerm::FilterFn(func) => {
+          func(pid, regs)
+        },
         SyscallPerm::Allow(ref mut count) => {
           if *count == 0 {
             false
@@ -95,6 +93,32 @@ impl SyscallFilter {
       }
     } else {
       true
+    }
+  }
+}
+
+impl SyscallPerm {
+  fn forbid() -> Self {
+    SyscallPerm::Forbid
+  }
+
+  fn allow(count: i32) -> Self {
+    SyscallPerm::Allow(count)
+  }
+}
+
+impl Debug for SyscallPerm {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      SyscallPerm::Forbid => {
+        f.debug_struct("Forbid").finish()
+      }
+      SyscallPerm::FilterFn(_) => {
+        f.debug_struct("FilterFn").field("func", &"[func]").finish()
+      }
+      SyscallPerm::Allow(count) => {
+        f.debug_tuple("Allow").field(count).finish()
+      }
     }
   }
 }
