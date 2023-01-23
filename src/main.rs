@@ -85,7 +85,11 @@ impl Cli {
         submission,
         ..
       } => make_compile_params(language, submission),
-      Commands::Run { program, arguments } => CatBoxParams::new(program, arguments),
+      Commands::Run { program, arguments } => {
+        let mut params = CatBoxParams::new(program, arguments);
+        params.chroot(true);
+        params
+      }
       Commands::Validate { .. } => {
         unimplemented!()
       }

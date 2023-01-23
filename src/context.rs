@@ -1,7 +1,9 @@
 use std::env;
+use std::path::PathBuf;
 
 use nix::sys::signal::Signal;
 use nix::unistd::{Gid, Group, Uid, User};
+use tempfile::tempdir;
 
 use crate::syscall::SyscallFilter;
 
@@ -18,7 +20,8 @@ pub struct CatBoxParams {
   pub(crate) process: u64,
   pub(crate) ptrace: Option<SyscallFilter>,
   pub(crate) stack_size: u64,
-  pub(crate) chroot: bool,
+  pub(crate) chroot: Option<PathBuf>,
+  pub(crate) cwd: PathBuf,
   pub(crate) mounts: Vec<MountPoint>,
   pub(crate) env: Vec<(String, String)>,
   pub(crate) stdin: String,
@@ -30,8 +33,18 @@ pub struct CatBoxParams {
 #[derive(Debug, Clone)]
 pub struct MountPoint {
   write: bool,
-  src: String,
-  dst: String,
+  src: PathBuf,
+  dst: PathBuf,
+}
+
+#[allow(unused)]
+pub struct CatBoxResult {
+  pub(crate) status: Option<i32>,
+  pub(crate) signal: Option<Signal>,
+  pub(crate) time: u64,
+  pub(crate) time_user: u64,
+  pub(crate) time_sys: u64,
+  pub(crate) memory: u64,
 }
 
 impl CatBoxParams {
@@ -53,7 +66,8 @@ impl CatBoxParams {
       process: 1,
       ptrace: Some(SyscallFilter::default()),
       stack_size: u64::MAX,
-      chroot: false,
+      chroot: None,
+      cwd: env::current_dir().unwrap(),
       mounts: vec![],
       env: vec![],
       stdin: String::from("/dev/null"),
@@ -78,7 +92,12 @@ impl CatBoxParams {
   }
 
   pub fn chroot(self: &mut Self, flag: bool) -> &mut Self {
-    self.chroot = flag;
+    if flag {
+      let temp = tempdir().unwrap();
+      self.chroot = Some(temp.into_path());
+    } else {
+      self.chroot = None;
+    }
     self
   }
 
@@ -93,12 +112,32 @@ impl CatBoxParams {
   }
 }
 
-#[allow(unused)]
-pub struct CatBoxResult {
-  pub(crate) status: Option<i32>,
-  pub(crate) signal: Option<Signal>,
-  pub(crate) time: u64,
-  pub(crate) time_user: u64,
-  pub(crate) time_sys: u64,
-  pub(crate) memory: u64,
+impl MountPoint {
+  pub fn read(src: PathBuf, dst: PathBuf) -> Self {
+    MountPoint {
+      write: false,
+      src,
+      dst,
+    }
+  }
+
+  pub fn write(src: PathBuf, dst: PathBuf) -> Self {
+    MountPoint {
+      write: true,
+      src,
+      dst,
+    }
+  }
+
+  pub fn read_only(&self) -> bool {
+    !self.write
+  }
+
+  pub fn src(&self) -> &PathBuf {
+    &self.src
+  }
+
+  pub fn dst(&self) -> &PathBuf {
+    &self.dst
+  }
 }

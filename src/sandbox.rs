@@ -1,24 +1,26 @@
 use std::env;
 use std::error::Error;
 use std::ffi::{c_uint, CString};
-use std::fs::{File, OpenOptions};
+use std::fs::{canonicalize, File, OpenOptions};
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::IntoRawFd;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use log::{debug, error, info};
-use nix::libc;
+use log::{debug, error, info, warn};
 use nix::libc::{
   RLIM_INFINITY, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR,
 };
+use nix::mount::{mount, MsFlags};
 use nix::sys::ptrace;
 use nix::sys::resource::{setrlimit, Resource};
 use nix::sys::signal::Signal;
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{alarm, dup2, execvpe, fork, setgid, setuid, ForkResult};
+use nix::unistd::{alarm, chdir, chroot, dup2, execvpe, fork, setgid, setuid, ForkResult};
+use nix::{libc, NixPath};
+use tempfile::tempdir;
 
 use crate::cgroup::CatBoxCgroup;
-use crate::context::CatBoxResult;
+use crate::context::{CatBoxResult, MountPoint};
 use crate::utils::into_c_string;
 use crate::CatBoxParams;
 
@@ -73,9 +75,9 @@ fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   } else {
     null_fd.clone()
   };
-  if let Err(err) = dup2(stderr_fd, STDERR_FILENO) {
-    error!("Redirect stderr fails: {}", err);
-  }
+  // if let Err(err) = dup2(stderr_fd, STDERR_FILENO) {
+  //   error!("Redirect stderr fails: {}", err);
+  // }
 
   debug!("Redirect child process IO ok");
 
@@ -98,6 +100,70 @@ fn set_resource_limit(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   };
   debug!("Set stack size {} bytes", stack_size);
   setrlimit(Resource::RLIMIT_STACK, stack_size, stack_size)?;
+
+  Ok(())
+}
+
+// fn ensure_directory(path: &PathBuf) {}
+
+/// chroot
+fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
+  mount::<PathBuf, PathBuf, PathBuf, PathBuf>(
+    Some(new_root),
+    new_root,
+    None,
+    MsFlags::MS_BIND | MsFlags::MS_RDONLY | MsFlags::MS_REC,
+    None,
+  )?;
+  mount::<PathBuf, PathBuf, PathBuf, PathBuf>(
+    None,
+    new_root,
+    None,
+    MsFlags::MS_BIND | MsFlags::MS_REMOUNT | MsFlags::MS_RDONLY | MsFlags::MS_REC,
+    None,
+  )?;
+
+  let program_dir = PathBuf::from(&params.program);
+  let program_dir = program_dir.parent().unwrap();
+  let program_dir = canonicalize(&program_dir).unwrap();
+  let mounts = vec![
+    vec![MountPoint::read(program_dir.clone(), program_dir.clone())],
+    params.mounts.clone(),
+  ]
+  .concat();
+
+  for mount_point in mounts {
+    if !mount_point.dst().is_absolute() {
+      error!(
+        "The dst path {} in mounts should be absolute.",
+        mount_point.dst().to_string_lossy()
+      );
+      continue;
+    }
+
+    let target = mount_point.dst().strip_prefix(Path::new("/")).unwrap();
+    let target = new_root.join(target);
+
+    mount::<PathBuf, PathBuf, PathBuf, PathBuf>(
+      Some(mount_point.src()),
+      &target,
+      None,
+      MsFlags::MS_BIND | MsFlags::MS_REC,
+      None,
+    )?;
+    if mount_point.read_only() {
+      mount::<PathBuf, PathBuf, PathBuf, PathBuf>(
+        None,
+        &target,
+        None,
+        MsFlags::MS_BIND | MsFlags::MS_REMOUNT | MsFlags::MS_RDONLY | MsFlags::MS_REC,
+        None,
+      )?;
+    }
+  }
+
+  chroot(new_root)?;
+  // chdir(&params.cwd)?;
 
   Ok(())
 }
@@ -149,11 +215,11 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
               // 处理系统调用
               Signal::SIGTRAP => {
                 let user_regs = ptrace::getregs(pid)?;
-                let syscall_id = user_regs.orig_rax;
-                debug!(
-                  "Child process #{}. performed a syscall: {}",
-                  pid, syscall_id
-                );
+                // let syscall_id = user_regs.orig_rax;
+                // debug!(
+                //   "Child process #{}. performed a syscall: {}",
+                //   pid, syscall_id
+                // );
 
                 if let Some(filter) = &mut filter {
                   if filter.filter(&pid, &user_regs) {
@@ -223,10 +289,20 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       })
     }
     Ok(ForkResult::Child) => {
-      info!("This is child process");
+      info!("Child process is running");
 
       // 重定向输入输出
       redirect_io(&params)?;
+
+      // chroot
+      if let Some(chroot) = &params.chroot {
+        if let Err(err) = change_root(chroot, &params) {
+          error!("Chroot fails: {}", err);
+        }
+      }
+
+      // 设置时钟
+      set_alarm(&params);
 
       // setrlimit
       set_resource_limit(&params)?;
@@ -238,9 +314,6 @@ pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       if let Err(err) = setuid(params.uid) {
         error!("Set uid {} fails: {}", params.uid, err);
       }
-
-      // 设置时钟
-      set_alarm(&params);
 
       // execvpe 运行用户程序
       let program = into_c_string(&params.program);

@@ -45,7 +45,10 @@ fn run_cpp(file: &str, ok: bool) {
     let sub_in = sub_in.to_string_lossy().to_string();
     let sub_out = dir.join("sub.out");
     let sub_out = sub_out.to_string_lossy().to_string();
-    params.stdin(sub_in.clone()).stdout(sub_out.clone());
+    params
+      .stdin(sub_in.clone())
+      .stdout(sub_out.clone())
+      .chroot(true);
     run(params).unwrap();
 
     let out = fs::read_to_string(sub_out.clone()).unwrap();
@@ -94,14 +97,3 @@ fn it_should_not_run_fork() {
   setup_logger();
   run_cpp("fork.cpp", false);
 }
-
-// #[test]
-// fn test_dev_null() {
-//   let null_fd = OpenOptions::new()
-//     .read(true)
-//     .write(true)
-//     .open("/dev/null").unwrap()
-//     .into_raw_fd();
-//   dup2(null_fd, STDERR_FILENO);
-//   println!("Hello");
-// }
