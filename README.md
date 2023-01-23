@@ -27,10 +27,13 @@ $ ./init.sh $USER
 
 ```bash
 # Compile C++ source code
-$ catj compile ./fixtures/aplusb/source/ac.cpp -l cpp -o a.out
+$ catj compile ./fixtures/aplusb/source/ac.cpp -o a.out
 
 # Run a.out
-$ catj run --stdin ./fixtures/aplusb/testcases/1.in --stdout ./logs/sub.out -- ./a.out
+$ catj run --stdin ./fixtures/aplusb/testcases/1.in -- ./a.out
+
+# Generate report
+$ catj --report run --stdin ./fixtures/aplusb/testcases/1.in --stdout ./sub.out -- ./a.out
 ```
 
 ## License
