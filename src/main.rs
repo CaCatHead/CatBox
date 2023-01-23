@@ -8,6 +8,8 @@ use clap::{command, Parser, Subcommand};
 use context::CatBoxResult;
 use flexi_logger::{FileSpec, Logger};
 use log::{error, info};
+use nix::libc::STDOUT_FILENO;
+use nix::unistd::isatty;
 
 use crate::catbox::run;
 use crate::context::CatBoxParams;
@@ -24,8 +26,11 @@ mod utils;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-  #[arg(long, help = "Output report")]
+  #[arg(short, long, help = "Output report")]
   report: bool,
+
+  #[arg(long, requires = "report", help = "Output JSON format report")]
+  json: bool,
 
   #[arg(short, long, help = "Time limit (unit: ms)")]
   time: Option<u64>,
@@ -229,6 +234,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     .start()?;
 
   let cli = Cli::parse();
+  let report = cli.report;
+  let json_format = cli.json;
   let params = cli.resolve()?;
 
   info!("Start running catj");
@@ -241,14 +248,46 @@ fn main() -> Result<(), Box<dyn Error>> {
   match result {
     Ok(results) => {
       info!("Running catj finished");
-      if results.len() == 1 {
-        let result = results.first().unwrap();
-        println!("status: {}", result.status.map_or_else(|| "null".to_string(), |v| v.to_string()));
-        println!("signal: {}", result.signal.map_or_else(|| "null".to_string(), |v| v.to_string()));
-        println!("time: {}", result.time);
-        println!("time_user: {}", result.time_user);
-        println!("time_sys: {}", result.time_sys);
-        println!("memory: {}", result.memory);
+      if report {
+        if results.len() == 1 {
+          let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
+
+          let result = results.first().unwrap();
+
+          if json_format || !is_tty {
+            let status = result
+              .status
+              .map_or_else(|| "null".to_string(), |v| v.to_string());
+            let signal = result
+              .signal
+              .map_or_else(|| "null".to_string(), |v| format!("\"{}\"", v));
+
+            println!("{{");
+            println!("  \"status\": {},", status);
+            println!("  \"signal\": {},", signal);
+            println!("  \"time\": {},", result.time);
+            println!("  \"time_user\": {},", result.time_user);
+            println!("  \"time_sys\": {},", result.time_sys);
+            println!("  \"memory\": {}", result.memory);
+            println!("}}");
+          } else {
+            let status = result.status.map_or_else(
+              || "\x1b[91m×\x1b[39m".to_string(),
+              |v| format!("\x1b[9{}m{}\x1b[39m", if v == 0 { 2 } else { 1 }, v),
+            );
+            let signal = result.signal.map_or_else(
+              || "\x1b[92m✓\x1b[39m".to_string(),
+              |v| format!("\x1b[91m{}\x1b[39m", v),
+            );
+
+            println!("\x1b[1mStatus\x1b[22m     {}", status);
+            println!("\x1b[1mSignal\x1b[22m     {}", signal);
+            println!("\x1b[1mTime\x1b[22m       {} ms", result.time);
+            println!("\x1b[1mTime user\x1b[22m  {} ms", result.time_user);
+            println!("\x1b[1mTime sys\x1b[22m   {} ms", result.time_sys);
+            println!("\x1b[1mMemory\x1b[22m     {} KB", result.memory);
+          }
+        }
       }
       Ok(())
     }
