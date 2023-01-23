@@ -146,6 +146,17 @@ impl CatBoxParams {
     self
   }
 
+  pub fn parse_env(self: &mut Self, text: String) -> Result<&mut Self, String> {
+    let arr = text.split("=").collect::<Vec<&str>>();
+    if arr.len() == 2 {
+      let key = arr.get(0).unwrap();
+      let value = arr.get(1).unwrap();
+      Ok(self.env(*key, *value))
+    } else {
+      Err("Wrong environment variable string format".to_string())
+    }
+  }
+
   pub fn env<KS: Into<String>, VS: Into<String>>(self: &mut Self, key: KS, value: VS) -> &mut Self {
     self.env.push((key.into(), value.into()));
     self

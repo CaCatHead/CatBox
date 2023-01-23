@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use clap::{command, Parser, Subcommand};
 use flexi_logger::{Duplicate, FileSpec, Logger};
-use log::{debug, error, info};
+use log::{error, info};
 
 use crate::catbox::run;
 use crate::context::CatBoxParams;
@@ -26,6 +26,9 @@ struct Cli {
 
   #[arg(short, long, help = "Memory limit")]
   memory: Option<u64>,
+
+  #[arg(long, help = "Pass environment variables (key=value)")]
+  env: Vec<String>,
 
   #[structopt(subcommand)]
   command: Commands,
@@ -83,7 +86,7 @@ enum Commands {
 }
 
 impl Cli {
-  fn resolve(self) -> Vec<CatBoxParams> {
+  fn resolve(self) -> Result<Vec<CatBoxParams>, Box<dyn Error>> {
     let mut command = match self.command {
       Commands::Compile {
         language,
@@ -135,7 +138,13 @@ impl Cli {
       command.memory_limit(memory);
     }
 
-    vec![command]
+    for env in self.env {
+      if let Err(_) = command.parse_env(env) {
+        error!("Parse environment variable string fails");
+      }
+    }
+
+    Ok(vec![command])
   }
 }
 
@@ -165,7 +174,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     .start()?;
 
   let cli = Cli::parse();
-  let params = cli.resolve();
+  let params = cli.resolve()?;
 
   info!("Start running catbox");
 
