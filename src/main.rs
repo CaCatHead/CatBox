@@ -19,6 +19,7 @@ use crate::utils::default_format;
 mod catbox;
 mod cgroup;
 mod context;
+mod pipe;
 mod preset;
 mod syscall;
 mod utils;

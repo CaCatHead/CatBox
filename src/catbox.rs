@@ -19,24 +19,9 @@ use nix::unistd::{alarm, chdir, chroot, execvpe, fork, setgid, setuid, ForkResul
 
 use crate::cgroup::CatBoxCgroup;
 use crate::context::CatBoxResult;
+use crate::pipe::CatBoxPipe;
 use crate::utils::into_c_string;
 use crate::CatBoxParams;
-
-// struct CatBoxPipe(RawFd, RawFd);
-//
-// impl CatBoxPipe {
-//   fn new() -> Result<Self, Box<dyn Error>> {
-//     let result = pipe2(OFlag::O_CLOEXEC | OFlag::O_NONBLOCK)?;
-//     Ok(CatBoxPipe(result.0, result.1))
-//   }
-// }
-//
-// impl Drop for CatBoxPipe {
-//   fn drop(&mut self) {
-//     close(self.0).unwrap();
-//     close(self.1).unwrap();
-//   }
-// }
 
 /// 重定向输出输出
 fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
@@ -250,8 +235,12 @@ fn get_env(params: &CatBoxParams) -> Vec<CString> {
 }
 
 pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
+  let pipe = CatBoxPipe::new()?;
+
   match unsafe { fork() } {
     Ok(ForkResult::Parent { child, .. }) => {
+      let pipe = pipe.read()?;
+
       // 设置 cgroup
       let cgroup = CatBoxCgroup::new(&params, child);
 
@@ -346,6 +335,10 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
         }
       };
 
+      let message = pipe.read().ok();
+      info!("message: {:?}", message);
+      pipe.close()?;
+
       let usage = cgroup.usage();
       info!("{:?}", usage);
 
@@ -360,6 +353,8 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
     }
     Ok(ForkResult::Child) => {
       info!("Child process is running");
+
+      let pipe = pipe.write()?;
 
       // 重定向输入输出
       redirect_io(&params)?;
@@ -418,13 +413,17 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
 
       let result = execvpe(path, &args, env.as_slice());
       if let Err(e) = result {
-        error!("Execvpe user submission fails: {}", e.desc());
+        pipe.write(format!("Execvpe fails: {}", e.desc()))?;
+
+        error!("Execvpe fails: {}", e.desc());
         info!("Submission path: {}", params.program);
         let args = args
           .iter()
           .map(|cstr| cstr.to_string_lossy().into())
           .collect::<Vec<Box<str>>>();
         info!("Submission args: {}", args.join(" "));
+
+        pipe.close()?;
       }
 
       unsafe { libc::_exit(0) };
