@@ -73,7 +73,7 @@ impl CatBoxParams {
       chroot: None,
       cwd: env::current_dir().unwrap(),
       mounts: MountPoint::defaults(),
-      env: vec![],
+      env: vec![("PATH".to_string(), env::var("PATH").unwrap_or("".to_string()))],
       stdin: String::from("/dev/null"),
       stdout: String::from("/dev/null"),
       stderr: String::from("/dev/null"),

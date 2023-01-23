@@ -174,8 +174,7 @@ fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), Box<dyn 
 /// 获取环境变量
 /// 默认只传递 PATH 环境变量
 fn get_env(params: &CatBoxParams) -> Vec<CString> {
-  let path = format!("PATH={}", env::var("PATH").unwrap_or("".to_string()));
-  let mut envs = vec![into_c_string(&path)];
+  let mut envs = vec![];
   for (key, value) in params.env.iter() {
     let pair = format!("{}={}", key, value);
     envs.push(into_c_string(&pair));
