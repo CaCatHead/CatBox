@@ -116,6 +116,18 @@ impl CatBoxParams {
     self
   }
 
+  pub fn parse_mount_read(self: &mut Self, text: String) -> Result<&mut Self, String> {
+    let mount_point = MountPoint::parse_read(text)?;
+    self.mounts.push(mount_point);
+    Ok(self)
+  }
+
+  pub fn parse_mount_write(self: &mut Self, text: String) -> Result<&mut Self, String> {
+    let mount_point = MountPoint::parse_write(text)?;
+    self.mounts.push(mount_point);
+    Ok(self)
+  }
+
   pub fn mount_read<SP: Into<PathBuf>, DP: Into<PathBuf>>(
     self: &mut Self,
     src: SP,
@@ -176,6 +188,36 @@ impl MountPoint {
       Self::read(PathBuf::from("/lib"), PathBuf::from("/lib")),
       Self::read(PathBuf::from("/lib64"), PathBuf::from("/lib64")),
     ]
+  }
+
+  fn parse(write: bool, text: String) -> Result<Self, String> {
+    let arr = text.split(":").collect::<Vec<&str>>();
+    if arr.len() == 1 {
+      let p = arr.get(0).unwrap();
+      Ok(MountPoint {
+        write,
+        src: PathBuf::from(p),
+        dst: PathBuf::from(p),
+      })
+    } else if arr.len() == 2 {
+      let src = arr.get(0).unwrap();
+      let dst = arr.get(1).unwrap();
+      Ok(MountPoint {
+        write,
+        src: PathBuf::from(src),
+        dst: PathBuf::from(dst),
+      })
+    } else {
+      Err("Wrong mount string format".to_string())
+    }
+  }
+
+  pub fn parse_read(text: String) -> Result<Self, String> {
+    Self::parse(false, text)
+  }
+
+  pub fn parse_write(text: String) -> Result<Self, String> {
+    Self::parse(true, text)
   }
 
   pub fn read(src: PathBuf, dst: PathBuf) -> Self {

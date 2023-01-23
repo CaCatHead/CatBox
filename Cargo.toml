@@ -9,7 +9,6 @@ readme = "README.md"
 homepage = "https://github.com/yjl9903/CatBox"
 repository = "https://github.com/yjl9903/CatBox"
 license = "MIT"
-license-file = "LICENSE"
 keywords = ["sandbox", "cli"]
 categories = ["command-line-utilities"]
 

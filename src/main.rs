@@ -1,5 +1,3 @@
-#![rustfmt::skip::attributes(arg)]
-
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
@@ -98,14 +96,28 @@ impl Cli {
         stdin,
         stdout,
         stderr,
-        ..
+        read,
+        write,
       } => {
         let mut params = CatBoxParams::new(program, arguments);
+
+        for text in read {
+          if let Err(msg) = params.parse_mount_read(text) {
+            error!("Parse mount string fails");
+          }
+        }
+        for text in write {
+          if let Err(msg) = params.parse_mount_write(text) {
+            error!("Parse mount string fails");
+          }
+        }
+
         params
           .stdin(stdin)
           .stdout(stdout)
           .stderr(stderr)
           .chroot(true);
+
         params
       }
       Commands::Validate { .. } => {
