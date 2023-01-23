@@ -27,8 +27,14 @@ struct Cli {
   #[arg(short, long, help = "Memory limit")]
   memory: Option<u64>,
 
-  #[arg(long, help = "Pass environment variables (key=value)")]
+  #[arg(long, value_name = "KEY=VALUE", help = "Pass environment variables")]
   env: Vec<String>,
+
+  #[arg(long, help = "Set child process uid")]
+  uid: Option<u32>,
+
+  #[arg(long, help = "Set child process gid")]
+  gid: Option<u32>,
 
   #[structopt(subcommand)]
   command: Commands,
@@ -38,7 +44,7 @@ struct Cli {
 enum Commands {
   #[command(about = "Run user program")]
   Run {
-    #[arg(help = "Program")]
+    #[arg(help = "Program to be executed")]
     program: String,
 
     #[arg(help = "Arguments")]
@@ -53,11 +59,20 @@ enum Commands {
     #[arg(short = 'e', long, default_value = "/dev/null", help = "Redirect stderr")]
     stderr: String,
 
-    #[arg(short = 'R', long, help = "Mount read-only directory")]
+    #[arg(short = 'R', long, value_name = "SRC:DST", help = "Mount read-only directory")]
     read: Vec<String>,
 
-    #[arg(short = 'W', long, help = "Mount read-write directory")]
+    #[arg(short = 'W', long, value_name = "SRC:DST", help = "Mount read-write directory")]
     write: Vec<String>,
+
+    #[arg(long, help = "The number of processes")]
+    process: Option<u64>,
+
+    #[arg(long, help = "Disable chroot")]
+    no_chroot: bool,
+
+    #[arg(long, help = "Disable ptrace")]
+    no_ptrace: bool,
   },
 
   #[command(about = "Compile user code")]
@@ -70,6 +85,12 @@ enum Commands {
 
     #[arg(short, long, help = "Output file")]
     output: String,
+
+    #[arg(long, default_value = "/dev/null", help = "Redirect stdout")]
+    stdout: String,
+
+    #[arg(long, default_value = "/dev/null", help = "Redirect stderr")]
+    stderr: String,
   },
 
   #[command(about = "Run validator")]
@@ -92,6 +113,7 @@ impl Cli {
         language,
         submission,
         output,
+        ..
       } => make_compile_params(language, submission, output),
       Commands::Run {
         program,
@@ -101,6 +123,9 @@ impl Cli {
         stderr,
         read,
         write,
+        process,
+        no_chroot,
+        no_ptrace,
       } => {
         let mut params = CatBoxParams::new(program, arguments);
 
@@ -121,7 +146,14 @@ impl Cli {
           .stdin(stdin)
           .stdout(stdout)
           .stderr(stderr)
-          .chroot(true);
+          .chroot(!no_chroot);
+
+        if no_ptrace {
+          params.ptrace(None);
+        }
+        if let Some(process) = process {
+          params.process(process);
+        }
 
         params
       }
@@ -138,6 +170,13 @@ impl Cli {
     }
     if let Some(memory) = self.memory {
       command.memory_limit(memory);
+    }
+
+    if let Some(uid) = self.uid {
+      command.uid(uid);
+    }
+    if let Some(gid) = self.gid {
+      command.gid(gid);
     }
 
     for env in self.env {

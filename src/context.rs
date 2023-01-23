@@ -1,8 +1,8 @@
-use log::{debug, error, info};
 use std::env;
 use std::fs::remove_dir_all;
 use std::path::PathBuf;
 
+use log::{debug, error, info};
 use nix::sys::signal::Signal;
 use nix::unistd::{Gid, Group, Uid, User};
 use tempfile::tempdir;
@@ -87,6 +87,21 @@ impl CatBoxParams {
 
   pub fn memory_limit(self: &mut Self, value: u64) -> &mut Self {
     self.memory_limit = value;
+    self
+  }
+
+  pub fn uid(self: &mut Self, uid: u32) -> &mut Self {
+    self.uid = Uid::from(uid);
+    self
+  }
+
+  pub fn gid(self: &mut Self, gid: u32) -> &mut Self {
+    self.gid = Gid::from(gid);
+    self
+  }
+
+  pub fn process(self: &mut Self, value: u64) -> &mut Self {
+    self.process = value;
     self
   }
 
