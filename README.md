@@ -14,7 +14,7 @@ A light process isolation sandbox used for Competitive Programming contest.
 
 > **Note**
 >
-> To enable all of above features, it is highly recommended to use it under the root user, otherwise it may fall back automatically.
+> To enable all of above features, it is highly recommended to use it under the **root** user, otherwise it may fall back automatically.
 
 ## Installation
 
