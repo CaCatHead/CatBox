@@ -187,7 +187,7 @@ fn get_env(params: &CatBoxParams) -> Vec<CString> {
   envs
 }
 
-pub fn run(params: CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
+pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
   match unsafe { fork() } {
     Ok(ForkResult::Parent { child, .. }) => {
       // 设置 cgroup

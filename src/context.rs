@@ -1,4 +1,6 @@
+use log::{debug, error, info};
 use std::env;
+use std::fs::remove_dir_all;
 use std::path::PathBuf;
 
 use nix::sys::signal::Signal;
@@ -136,6 +138,23 @@ impl CatBoxParams {
   pub fn debug(self: &mut Self) -> &mut Self {
     self.debug = true;
     self
+  }
+
+  pub fn close(self: Self) {
+    if let Some(chroot) = self.chroot {
+      if self.debug {
+        debug!("Persist new root: {}", chroot.to_string_lossy());
+      } else {
+        match remove_dir_all(&chroot) {
+          Ok(_) => {
+            info!("Remov new root: {}", chroot.to_string_lossy())
+          }
+          Err(_) => {
+            error!("Fails removing new root: {}", chroot.to_string_lossy())
+          }
+        }
+      }
+    }
   }
 }
 

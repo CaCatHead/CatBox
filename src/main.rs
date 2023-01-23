@@ -1,9 +1,10 @@
 use std::env;
+use std::error::Error;
 use std::path::PathBuf;
 
 use clap::{command, Parser, Subcommand};
 use flexi_logger::{DeferredNow, Duplicate, FileSpec, Logger};
-use log::{info, Record};
+use log::{error, info, Record};
 
 use crate::context::CatBoxParams;
 use crate::preset::make_compile_params;
@@ -24,9 +25,6 @@ struct Cli {
 
   #[arg(short, long, default_value_t = 262144)]
   memory: u64,
-
-  #[arg(long, default_value_t = false)]
-  verbose: bool,
 
   #[arg(long, default_value = "/dev/null")]
   stdin: String,
@@ -123,7 +121,14 @@ pub fn default_format(
   )
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn start(tasks: &Vec<CatBoxParams>) -> Result<(), Box<dyn Error>> {
+  for param in tasks {
+    run(&param)?;
+  }
+  Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
   let cli = Cli::parse();
   let params = cli.resolve();
 
@@ -146,11 +151,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   info!("Start running catbox");
 
+  let result = start(&params);
   for param in params {
-    run(param)?;
+    param.close();
   }
 
-  info!("Running catbox finished");
-
-  Ok(())
+  match result {
+    Ok(_) => {
+      info!("Running catj finished");
+      Ok(())
+    }
+    Err(err) => {
+      error!("Running catj failed");
+      Err(err)
+    }
+  }
 }

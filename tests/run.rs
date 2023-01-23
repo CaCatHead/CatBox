@@ -44,13 +44,14 @@ fn run_cpp(file: &str, ok: bool) {
     let sub_in = sub_in.to_string_lossy().to_string();
     let sub_out = dir.join("sub.out");
     let sub_out = sub_out.to_string_lossy().to_string();
+
     params
       .debug()
       .stdin(sub_in.clone())
       .stdout(sub_out.clone())
       .chroot(true)
       .mount_read(&dir, &dir);
-    run(params).unwrap();
+    run(&params).unwrap();
 
     let out = fs::read_to_string(sub_out.clone()).unwrap();
     let ans = fs::read_to_string(PathBuf::from(format!(
@@ -69,6 +70,7 @@ fn run_cpp(file: &str, ok: bool) {
     }
 
     remove_file(Path::new(sub_out.as_str())).unwrap();
+    params.close();
   }
 
   info!("Running {} ok", file);
