@@ -8,12 +8,12 @@ use log::{debug, error, info, Record};
 
 use crate::context::CatBoxParams;
 use crate::preset::make_compile_params;
-use crate::sandbox::run;
+use crate::catbox::run;
 
 mod cgroup;
 mod context;
 mod preset;
-mod sandbox;
+mod catbox;
 mod syscall;
 mod utils;
 

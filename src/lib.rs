@@ -1,8 +1,8 @@
 pub use context::CatBoxParams;
-pub use sandbox::run;
+pub use catbox::run;
 
 mod cgroup;
 mod context;
-mod sandbox;
+mod catbox;
 mod syscall;
 mod utils;
