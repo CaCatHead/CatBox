@@ -1,27 +1,21 @@
-use std::env;
 use std::error::Error;
 use std::ffi::{c_uint, CString};
-use std::fs::{create_dir_all, File, OpenOptions};
-use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::io::{IntoRawFd, RawFd};
+use std::fs::create_dir_all;
+use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
 
 use log::{debug, error, info};
 use nix::fcntl::open;
 use nix::fcntl::OFlag;
 use nix::libc;
-use nix::libc::{
-  RLIM_INFINITY, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR,
-};
+use nix::libc::{RLIM_INFINITY, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
 use nix::mount::{mount, MsFlags};
 use nix::sys::ptrace;
 use nix::sys::resource::{setrlimit, Resource};
 use nix::sys::signal::Signal;
 use nix::sys::stat::Mode;
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{
-  alarm, chdir, chroot, close, dup2, execvpe, fork, pipe2, setgid, setuid, write, ForkResult,
-};
+use nix::unistd::{alarm, chdir, chroot, close, dup2, execvpe, fork, setgid, setuid, ForkResult};
 
 use crate::cgroup::CatBoxCgroup;
 use crate::context::CatBoxResult;
@@ -47,11 +41,12 @@ use crate::CatBoxParams;
 /// 重定向输出输出
 fn redirect_io(params: &CatBoxParams) -> Result<(RawFd, RawFd, RawFd, RawFd), Box<dyn Error>> {
   debug!("Redirect /dev/null");
-  let null_fd = OpenOptions::new()
-    .read(true)
-    .write(true)
-    .open("/dev/null")?
-    .into_raw_fd();
+  let null_fd = open(
+    "/dev/null",
+    OFlag::O_RDONLY | OFlag::O_WRONLY,
+    Mode::empty(),
+  )
+  .unwrap();
 
   info!("Redirect child process stdin to {}", &params.stdin);
   let stdin_fd = if params.stdin != "/dev/null" {
