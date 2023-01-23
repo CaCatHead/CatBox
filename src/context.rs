@@ -1,8 +1,9 @@
 use std::env;
 use std::fs::remove_dir_all;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use log::{debug, error, info};
+use nix::mount::{umount, umount2, MntFlags};
 use nix::sys::signal::Signal;
 use nix::unistd::{Gid, Group, Uid, User};
 use tempfile::tempdir;
@@ -189,16 +190,32 @@ impl CatBoxParams {
   }
 
   pub fn close(self: Self) {
-    if let Some(chroot) = self.chroot {
+    if let Some(new_root) = self.chroot {
       if self.debug {
-        debug!("Persist new root: {}", chroot.to_string_lossy());
+        debug!("Persist new root: {}", new_root.to_string_lossy());
       } else {
-        match remove_dir_all(&chroot) {
+        for mount_point in &self.mounts {
+          let target = mount_point.dst().strip_prefix(Path::new("/")).unwrap();
+          let target = new_root.join(target);
+          debug!("Unmount directory {:?}", &target);
+          if let Err(err) = umount2(&target, MntFlags::MNT_FORCE | MntFlags::MNT_DETACH) {
+            error!("Fails umount {}: {}", target.to_string_lossy(), err);
+          }
+        }
+        if let Err(err) = umount2(&new_root, MntFlags::MNT_FORCE | MntFlags::MNT_DETACH) {
+          error!("Fails umount {}: {}", new_root.to_string_lossy(), err);
+        }
+
+        match remove_dir_all(&new_root) {
           Ok(_) => {
-            info!("Remove new root: {}", chroot.to_string_lossy());
+            info!("Remove new root: {}", new_root.to_string_lossy());
           }
           Err(err) => {
-            error!("Fails removing new root: {} ({})", chroot.to_string_lossy(), err);
+            error!(
+              "Fails removing new root: {} ({})",
+              new_root.to_string_lossy(),
+              err
+            );
           }
         }
       }

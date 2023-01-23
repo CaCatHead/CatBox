@@ -46,7 +46,7 @@ fn run_cpp(file: &str, ok: bool) {
     let sub_out = sub_out.to_string_lossy().to_string();
 
     params
-      .debug()
+      // .debug()
       .stdin(sub_in.clone())
       .stdout(sub_out.clone())
       .chroot(true)

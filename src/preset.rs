@@ -82,11 +82,15 @@ impl CompileOption {
       time_limit: 10000,
       memory_limit: 1048576,
       process: 10,
-      commands: vec![]
+      commands: vec![],
     }
   }
 
-  fn command<PS: Into<String>, AS: Into<String>>(self: &mut Self, program: PS, arguments: Vec<AS>) -> &mut Self {
+  fn command<PS: Into<String>, AS: Into<String>>(
+    self: &mut Self,
+    program: PS,
+    arguments: Vec<AS>,
+  ) -> &mut Self {
     let command = CompileCommand::new(program, arguments);
     self.commands.push(command);
     self
