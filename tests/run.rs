@@ -46,9 +46,11 @@ fn run_cpp(file: &str, ok: bool) {
     let sub_out = dir.join("sub.out");
     let sub_out = sub_out.to_string_lossy().to_string();
     params
+      .debug()
       .stdin(sub_in.clone())
       .stdout(sub_out.clone())
-      .chroot(true);
+      .chroot(true)
+      .mount_read(&dir, &dir);
     run(params).unwrap();
 
     let out = fs::read_to_string(sub_out.clone()).unwrap();

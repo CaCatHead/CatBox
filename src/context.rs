@@ -27,6 +27,7 @@ pub struct CatBoxParams {
   pub(crate) stdin: String,
   pub(crate) stdout: String,
   pub(crate) stderr: String,
+  pub(crate) debug: bool,
 }
 
 #[allow(unused)]
@@ -68,41 +69,61 @@ impl CatBoxParams {
       stack_size: u64::MAX,
       chroot: None,
       cwd: env::current_dir().unwrap(),
-      mounts: vec![],
+      mounts: MountPoint::defaults(),
       env: vec![],
       stdin: String::from("/dev/null"),
       stdout: String::from("/dev/null"),
       stderr: String::from("/dev/null"),
+      debug: false
     }
   }
 
-  pub fn stdin(self: &mut Self, path: String) -> &mut Self {
-    self.stdin = path;
+  pub fn stdin<PS: Into<String>>(self: &mut Self, path: PS) -> &mut Self {
+    self.stdin = path.into();
     self
   }
 
-  pub fn stdout(self: &mut Self, path: String) -> &mut Self {
-    self.stdout = path;
+  pub fn stdout<PS: Into<String>>(self: &mut Self, path: PS) -> &mut Self {
+    self.stdout = path.into();
     self
   }
 
-  pub fn stderr(self: &mut Self, path: String) -> &mut Self {
-    self.stdin = path;
+  pub fn stderr<PS: Into<String>>(self: &mut Self, path: PS) -> &mut Self {
+    self.stdin = path.into();
     self
   }
 
-  pub fn chroot(self: &mut Self, flag: bool) -> &mut Self {
-    if flag {
+  pub fn chroot(self: &mut Self, enable: bool) -> &mut Self {
+    if enable {
       let temp = tempdir().unwrap();
-      self.chroot = Some(temp.into_path());
+      let temp = temp.into_path();
+      self.chroot = Some(temp);
     } else {
       self.chroot = None;
     }
     self
   }
 
-  pub fn env(self: &mut Self, key: String, value: String) -> &mut Self {
-    self.env.push((key, value));
+  pub fn mount_read<SP: Into<PathBuf>, DP: Into<PathBuf>>(
+    self: &mut Self,
+    src: SP,
+    dst: DP,
+  ) -> &mut Self {
+    self.mounts.push(MountPoint::read(src.into(), dst.into()));
+    self
+  }
+
+  pub fn mount_write<SP: Into<PathBuf>, DP: Into<PathBuf>>(
+    self: &mut Self,
+    src: SP,
+    dst: DP,
+  ) -> &mut Self {
+    self.mounts.push(MountPoint::write(src.into(), dst.into()));
+    self
+  }
+
+  pub fn env<KS: Into<String>, VS: Into<String>>(self: &mut Self, key: KS, value: VS) -> &mut Self {
+    self.env.push((key.into(), value.into()));
     self
   }
 
@@ -110,9 +131,23 @@ impl CatBoxParams {
     self.ptrace = syscall_filter;
     self
   }
+
+  pub fn debug(self: &mut Self) -> &mut Self {
+    self.debug = true;
+    self
+  }
 }
 
 impl MountPoint {
+  pub fn defaults() -> Vec<Self> {
+    vec![
+      Self::read(PathBuf::from("/bin"), PathBuf::from("/bin")),
+      Self::read(PathBuf::from("/usr"), PathBuf::from("/usr")),
+      Self::read(PathBuf::from("/lib"), PathBuf::from("/lib")),
+      Self::read(PathBuf::from("/lib64"), PathBuf::from("/lib64")),
+    ]
+  }
+
   pub fn read(src: PathBuf, dst: PathBuf) -> Self {
     MountPoint {
       write: false,
