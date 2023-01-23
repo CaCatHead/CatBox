@@ -1,28 +1,27 @@
-use std::{env, fs};
+use std::env;
 use std::error::Error;
 use std::ffi::{c_uint, CString};
-use std::fs::{canonicalize, create_dir_all, File, OpenOptions};
+use std::fs::{create_dir_all, File, OpenOptions};
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::IntoRawFd;
 use std::path::{Path, PathBuf};
 
-use log::{debug, error, info, warn};
-use nix::{libc, NixPath};
+use log::{debug, error, info};
+use nix::libc;
 use nix::libc::{
-  RLIM_INFINITY, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO,
+  RLIM_INFINITY, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR,
 };
 use nix::mount::{mount, MsFlags};
 use nix::sys::ptrace;
-use nix::sys::resource::{Resource, setrlimit};
+use nix::sys::resource::{setrlimit, Resource};
 use nix::sys::signal::Signal;
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{alarm, chdir, chroot, dup2, execvpe, fork, ForkResult, setgid, setuid};
-use tempfile::tempdir;
+use nix::unistd::{alarm, chdir, chroot, dup2, execvpe, fork, setgid, setuid, ForkResult};
 
-use crate::CatBoxParams;
 use crate::cgroup::CatBoxCgroup;
-use crate::context::{CatBoxResult, MountPoint};
+use crate::context::CatBoxResult;
 use crate::utils::into_c_string;
+use crate::CatBoxParams;
 
 /// 重定向输出输出
 fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {

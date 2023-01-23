@@ -74,7 +74,7 @@ impl CatBoxParams {
       stdin: String::from("/dev/null"),
       stdout: String::from("/dev/null"),
       stderr: String::from("/dev/null"),
-      debug: false
+      debug: false,
     }
   }
 
@@ -132,6 +132,7 @@ impl CatBoxParams {
     self
   }
 
+  #[allow(unused)]
   pub fn debug(self: &mut Self) -> &mut Self {
     self.debug = true;
     self

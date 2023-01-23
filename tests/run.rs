@@ -1,5 +1,4 @@
-use std::fs::{self, remove_dir_all, remove_file, set_permissions, Permissions};
-use std::os::unix::fs::PermissionsExt;
+use std::fs::{self, remove_dir_all, remove_file};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Once;

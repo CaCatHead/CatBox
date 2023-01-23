@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry::Occupied;
 use std::collections::HashMap;
 use std::ffi::{c_long, c_ulonglong};
 
@@ -75,18 +76,19 @@ impl SyscallFilter {
     self
   }
 
-  pub fn filter(self: &mut Self, pid: &Pid, regs: &user_regs_struct) -> bool {
+  pub fn filter(self: &mut Self, _pid: &Pid, regs: &user_regs_struct) -> bool {
     let syscall_id = regs.orig_rax;
-    let entry = self.map.get(&syscall_id);
-    if let Some(perm) = entry {
-      match *perm {
+    let entry = self.map.entry(syscall_id);
+    if let Occupied(mut entry) = entry {
+      let perm = entry.get_mut();
+      match perm {
         SyscallPerm::Forbid => false,
         SyscallPerm::FilterFn => false,
-        SyscallPerm::Allow(mut count) => {
-          if count == 0 {
+        SyscallPerm::Allow(ref mut count) => {
+          if *count == 0 {
             false
           } else {
-            count -= 1;
+            *count -= 1;
             true
           }
         }
