@@ -105,13 +105,15 @@ impl Cli {
         let mut params = CatBoxParams::new(program, arguments);
 
         for text in read {
-          if let Err(_) = params.parse_mount_read(text) {
+          if let Err(msg) = params.parse_mount_read(text) {
             error!("Parse mount string fails");
+            return Err(Box::<dyn Error>::from(msg));
           }
         }
         for text in write {
-          if let Err(_) = params.parse_mount_write(text) {
+          if let Err(msg) = params.parse_mount_write(text) {
             error!("Parse mount string fails");
+            return Err(Box::<dyn Error>::from(msg));
           }
         }
 
@@ -139,8 +141,9 @@ impl Cli {
     }
 
     for env in self.env {
-      if let Err(_) = command.parse_env(env) {
+      if let Err(msg) = command.parse_env(env) {
         error!("Parse environment variable string fails");
+        return Err(Box::<dyn Error>::from(msg));
       }
     }
 
