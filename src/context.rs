@@ -197,6 +197,7 @@ impl CatBoxParams {
       if self.debug {
         debug!("Persist new root: {}", new_root.to_string_lossy());
       } else {
+        let mut has_mount = false;
         for mount_point in &self.mounts {
           let target = mount_point.dst().strip_prefix(Path::new("/")).unwrap();
           let target = new_root.join(target);
@@ -204,12 +205,16 @@ impl CatBoxParams {
             debug!("Unmount directory {:?}", &target);
             if let Err(err) = umount2(&target, MntFlags::MNT_FORCE | MntFlags::MNT_DETACH) {
               error!("Fails umount {}: {}", target.to_string_lossy(), err);
+            } else {
+              has_mount = true;
             }
           }
         }
         if new_root.exists() {
-          if let Err(err) = umount2(&new_root, MntFlags::MNT_FORCE | MntFlags::MNT_DETACH) {
-            error!("Fails umount {}: {}", new_root.to_string_lossy(), err);
+          if has_mount {
+            if let Err(err) = umount2(&new_root, MntFlags::MNT_FORCE | MntFlags::MNT_DETACH) {
+              error!("Fails umount {}: {}", new_root.to_string_lossy(), err);
+            }
           }
 
           match remove_dir_all(&new_root) {
