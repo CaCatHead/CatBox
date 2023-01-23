@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use cgroups_rs::cgroup_builder::CgroupBuilder;
+use cgroups_rs::cpu::CpuController;
 use cgroups_rs::cpuacct::{CpuAcct, CpuAcctController};
 use cgroups_rs::memory::{MemController, MemSwap};
 use cgroups_rs::pid::PidController;
@@ -39,6 +40,11 @@ impl CatBoxCgroup {
       .subsystems()
       .iter()
       .any(|subsystem| subsystem.controller_name() == "memory");
+
+    let enable_cpu = hierarchy
+      .subsystems()
+      .iter()
+      .any(|subsystem| subsystem.controller_name() == "cpu");
     let enable_pids = hierarchy
       .subsystems()
       .iter()
@@ -60,6 +66,11 @@ impl CatBoxCgroup {
     } else {
       builder
     };
+    let builder = if enable_cpu {
+      builder.cpu().quota(1000000).period(1000000).done()
+    } else {
+      builder
+    };
     let builder = if enable_pids {
       builder
         .pid()
@@ -75,6 +86,9 @@ impl CatBoxCgroup {
     }
     if enable_memory {
       supported_controller.push("memory".to_string());
+    }
+    if enable_cpu {
+      supported_controller.push("cpu".to_string());
     }
     if enable_pids {
       supported_controller.push("pids".to_string());
@@ -119,6 +133,15 @@ impl CatBoxCgroup {
       };
       if add_task().is_err() {
         enable_memory = false;
+      }
+    }
+    if enable_cpu {
+      if let Some(cpu) = cgroup.controller_of::<CpuController>() {
+        if let Err(err) = cpu.add_task(&task) {
+          error!("Add cgroup cpu task fails: {}", err)
+        }
+      } else {
+        error!("Get cpu cgroup controller fails")
       }
     }
     if enable_pids {
