@@ -3,10 +3,12 @@ use std::error::Error;
 use std::ffi::{c_uint, CString};
 use std::fs::{create_dir_all, File, OpenOptions};
 use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::io::IntoRawFd;
+use std::os::unix::io::{IntoRawFd, RawFd};
 use std::path::{Path, PathBuf};
 
 use log::{debug, error, info};
+use nix::fcntl::open;
+use nix::fcntl::OFlag;
 use nix::libc;
 use nix::libc::{
   RLIM_INFINITY, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR,
@@ -15,16 +17,35 @@ use nix::mount::{mount, MsFlags};
 use nix::sys::ptrace;
 use nix::sys::resource::{setrlimit, Resource};
 use nix::sys::signal::Signal;
+use nix::sys::stat::Mode;
 use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{alarm, chdir, chroot, dup2, execvpe, fork, setgid, setuid, ForkResult};
+use nix::unistd::{
+  alarm, chdir, chroot, close, dup2, execvpe, fork, pipe2, setgid, setuid, write, ForkResult,
+};
 
 use crate::cgroup::CatBoxCgroup;
 use crate::context::CatBoxResult;
 use crate::utils::into_c_string;
 use crate::CatBoxParams;
 
+// struct CatBoxPipe(RawFd, RawFd);
+//
+// impl CatBoxPipe {
+//   fn new() -> Result<Self, Box<dyn Error>> {
+//     let result = pipe2(OFlag::O_CLOEXEC | OFlag::O_NONBLOCK)?;
+//     Ok(CatBoxPipe(result.0, result.1))
+//   }
+// }
+//
+// impl Drop for CatBoxPipe {
+//   fn drop(&mut self) {
+//     close(self.0).unwrap();
+//     close(self.1).unwrap();
+//   }
+// }
+
 /// 重定向输出输出
-fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
+fn redirect_io(params: &CatBoxParams) -> Result<(RawFd, RawFd, RawFd, RawFd), Box<dyn Error>> {
   debug!("Redirect /dev/null");
   let null_fd = OpenOptions::new()
     .read(true)
@@ -32,58 +53,78 @@ fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
     .open("/dev/null")?
     .into_raw_fd();
 
-  debug!("Redirect child process stdin to  {}", &params.stdin);
+  info!("Redirect child process stdin to {}", &params.stdin);
   let stdin_fd = if params.stdin != "/dev/null" {
     let file = Path::new(params.stdin.as_str());
-    let file = OpenOptions::new().read(true).open(file)?;
-    File::into_raw_fd(file)
+    open(file, OFlag::O_RDONLY, Mode::empty()).unwrap()
   } else {
     null_fd.clone()
   };
-  if let Err(err) = dup2(stdin_fd, STDIN_FILENO) {
-    error!("Redirect stdin fails: {}", err);
-  }
+  match dup2(stdin_fd, STDIN_FILENO) {
+    Ok(_) => {
+      if stdin_fd != null_fd {
+        close(stdin_fd)?;
+      }
+    }
+    Err(err) => {
+      error!("Redirect stdin fails: {}", err);
+    }
+  };
 
-  debug!("Redirect child process stdout to {}", &params.stdout);
+  info!("Redirect child process stdout to {}", &params.stdout);
   let stdout_fd = if params.stdin != "/dev/null" {
     let file = Path::new(params.stdout.as_str());
-    let file = OpenOptions::new()
-      .write(true)
-      .create(true)
-      .truncate(true)
-      .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
-      .open(file)?;
-    File::into_raw_fd(file)
+    open(
+      file,
+      OFlag::O_WRONLY | OFlag::O_TRUNC | OFlag::O_CREAT,
+      Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IWGRP,
+    )
+    .unwrap()
   } else {
     null_fd.clone()
   };
-  if let Err(err) = dup2(stdout_fd, STDOUT_FILENO) {
-    error!("Redirect stdout fails: {}", err);
-  }
+  match dup2(stdout_fd, STDOUT_FILENO) {
+    Ok(_) => {
+      if stdout_fd != null_fd {
+        close(stdout_fd)?;
+      }
+    }
+    Err(err) => {
+      error!("Redirect stdout fails: {}", err);
+    }
+  };
 
-  debug!("Redirect child process stderr to {}", &params.stderr);
+  info!("Redirect child process stderr to {}", &params.stderr);
   let stderr_fd = if params.stdin != "/dev/null" {
     let file = Path::new(params.stderr.as_str());
-    let file = OpenOptions::new()
-      .write(true)
-      .create(true)
-      .truncate(true)
-      .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
-      .open(file)?;
-    File::into_raw_fd(file)
+    open(
+      file,
+      OFlag::O_WRONLY | OFlag::O_TRUNC | OFlag::O_CREAT,
+      Mode::S_IWUSR | Mode::S_IRUSR | Mode::S_IRGRP | Mode::S_IWGRP,
+    )
+    .unwrap()
   } else {
     null_fd.clone()
   };
+  // debug 状态下不重定向 stderr 到 /dev/null，否则子进程看不到输出
   if params.stderr != "/dev/null" || !params.debug {
-    // debug 状态下不重定向 stderr 到 /dev/null，否则子进程看不到输出
-    if let Err(err) = dup2(stderr_fd, STDERR_FILENO) {
-      error!("Redirect stderr fails: {}", err);
+    match dup2(stderr_fd, STDERR_FILENO) {
+      Ok(_) => {
+        if stderr_fd != null_fd {
+          close(stderr_fd)?;
+        }
+      }
+      Err(err) => {
+        error!("Redirect stderr fails: {}", err);
+      }
     }
   }
 
-  debug!("Redirect child process IO ok");
+  close(null_fd)?;
 
-  Ok(())
+  info!("Redirect child process IO ok");
+
+  Ok((stdin_fd, stdout_fd, stderr_fd, null_fd))
 }
 
 /// 设置子进程时钟 signal，运行时限 + 1 秒
@@ -108,7 +149,7 @@ fn set_resource_limit(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
 
 /// chroot
 fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
-  debug!("Mount new root: {}", new_root.to_string_lossy());
+  info!("Mount new root: {}", new_root.to_string_lossy());
 
   mount::<PathBuf, PathBuf, PathBuf, PathBuf>(
     Some(new_root),
@@ -193,6 +234,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
 
       let (status, signal) = loop {
         let status = waitpid(child, None)?;
+
         match status {
           WaitStatus::Exited(pid, status) => {
             info!("Child process #{}. exited with status {}", pid, status);
@@ -300,30 +342,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       if let Some(chroot) = &params.chroot {
         match change_root(chroot, &params) {
           Ok(_) => {
-            debug!("--- Root Directory ---");
-            for entry in PathBuf::from("/").read_dir().unwrap() {
-              let entry = entry.unwrap();
-              let name = entry.file_name();
-              let name = name.to_string_lossy();
-              debug!("/{}", name);
-              if name == "tmp" {
-                let prefix = format!("/{}/", name);
-                if entry.file_type().unwrap().is_dir() {
-                  for entry in entry.path().read_dir().unwrap() {
-                    let entry = entry.unwrap();
-                    debug!("{}{}", prefix, entry.file_name().to_string_lossy());
-                    if entry.file_type().unwrap().is_dir() {
-                      let prefix = format!("{}{}/", prefix, entry.file_name().to_string_lossy());
-                      for entry in entry.path().read_dir().unwrap() {
-                        let entry = entry.unwrap();
-                        debug!("{}{}", prefix, entry.file_name().to_string_lossy());
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            debug!("--- Root Directory ---");
+            debug!("Chroot ok: {}", chroot.to_string_lossy());
           }
           Err(err) => {
             error!("Chroot fails: {}", err);
@@ -359,6 +378,14 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       let env = get_env(&params);
 
       info!("Start running program {}", params.program);
+      {
+        info!("Submission path: {}", params.program);
+        let args = args
+          .iter()
+          .map(|cstr| cstr.to_string_lossy().into())
+          .collect::<Vec<Box<str>>>();
+        info!("Submission args: {}", args.join(" "));
+      }
 
       // 启动 ptrace 追踪子进程
       if params.ptrace.is_some() {

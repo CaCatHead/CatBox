@@ -1,10 +1,18 @@
-use std::fs::{self, remove_dir_all, remove_file};
+use std::ffi::CString;
+use std::fs::{self, remove_dir_all, remove_file, File, OpenOptions};
+use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::io::IntoRawFd;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::ptr::null;
 use std::sync::Once;
 
 use flexi_logger::Logger;
 use log::info;
+use nix::libc::{self, STDERR_FILENO, STDIN_FILENO};
+use nix::libc::{STDOUT_FILENO, S_IRGRP, S_IRUSR, S_IWGRP, S_IWUSR};
+use nix::sys::wait::waitpid;
+use nix::unistd::{close, dup2, execvp, fork, write, ForkResult};
 use tempfile::tempdir;
 
 use catj::{run, CatBoxParams};
@@ -100,3 +108,54 @@ fn it_should_not_run_fork() {
   setup_logger();
   run_cpp("fork.cpp", false);
 }
+
+// #[test]
+// fn it_should_dup() {
+//   match unsafe { fork() } {
+//     Ok(ForkResult::Parent { child, .. }) => {
+//       waitpid(child, None).unwrap();
+//     }
+//     Ok(ForkResult::Child { .. }) => {
+//       let null_fd = OpenOptions::new()
+//         .read(true)
+//         .write(true)
+//         .open("/dev/null")
+//         .unwrap()
+//         .into_raw_fd();
+
+//       let file = Path::new("a.txt");
+//       let file = OpenOptions::new()
+//         .write(true)
+//         .create(true)
+//         .truncate(true)
+//         .mode(S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP)
+//         .open(file)
+//         .unwrap();
+//       let fd = File::into_raw_fd(file);
+
+//       println!("fd: {}", fd);
+//       println!("null: {}", null_fd);
+
+//       dup2(null_fd, STDIN_FILENO).unwrap();
+//       dup2(fd, STDOUT_FILENO).unwrap();
+//       dup2(null_fd, STDERR_FILENO).unwrap();
+
+//       close(fd).unwrap();
+//       close(null_fd).unwrap();
+
+//       write(libc::STDOUT_FILENO, "I'm a new child process\n".as_bytes()).ok();
+//       execvp(
+//         into_c_string("echo").as_c_str(),
+//         &[into_c_string("echo"), into_c_string("1234444")],
+//       )
+//       .unwrap();
+//     }
+//     Err(_) => {}
+//   };
+// }
+
+// fn into_c_string<S: Into<String>>(string: S) -> CString {
+//   let string = string.into();
+//   let string = string.as_str();
+//   CString::new(string).expect("Convert &str to CString should work")
+// }

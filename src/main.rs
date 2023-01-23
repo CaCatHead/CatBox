@@ -220,7 +220,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   let cli = Cli::parse();
   let params = cli.resolve()?;
 
-  info!("Start running catbox");
+  info!("Start running catj");
 
   let result = start(&params);
   for param in params {
