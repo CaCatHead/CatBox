@@ -247,6 +247,7 @@ impl MountPoint {
     vec![
       Self::read(PathBuf::from("/bin"), PathBuf::from("/bin")),
       Self::read(PathBuf::from("/usr"), PathBuf::from("/usr")),
+      Self::read(PathBuf::from("/etc"), PathBuf::from("/etc")),
       Self::read(PathBuf::from("/lib"), PathBuf::from("/lib")),
       Self::read(PathBuf::from("/lib64"), PathBuf::from("/lib64")),
     ]
