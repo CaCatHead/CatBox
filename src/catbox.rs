@@ -336,7 +336,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       };
 
       let message = pipe.read().ok();
-      info!("message: {:?}", message);
+      info!("Recv message: {:?}", message);
       pipe.close()?;
 
       let usage = cgroup.usage();
@@ -413,7 +413,8 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
 
       let result = execvpe(path, &args, env.as_slice());
       if let Err(e) = result {
-        pipe.write(format!("Execvpe fails: {}", e.desc()))?;
+        let sz = pipe.write(format!("Execvpe fails: {}", e.desc()))?;
+        info!("Write sz: {}", sz);
 
         error!("Execvpe fails: {}", e.desc());
         info!("Submission path: {}", params.program);
