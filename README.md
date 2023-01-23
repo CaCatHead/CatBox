@@ -12,7 +12,7 @@ A light process isolation sandbox used for Competitive Programming contest.
 + [setuid](https://man7.org/linux/man-pages/man2/setuid.2.html) and [setgid](https://man7.org/linux/man-pages/man2/setuid.2.html): Run submission under another user and group
 + [ptrace](https://man7.org/linux/man-pages/man2/ptrace.2.html): Filter submission syscall
 
-> **Notice**:
+> **Note**
 >
 > To enable all of above features, it is highly recommended to use it under the root user, otherwise it may fall back automatically.
 
