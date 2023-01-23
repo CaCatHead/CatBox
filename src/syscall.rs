@@ -62,8 +62,14 @@ impl SyscallFilter {
     self
   }
 
-  pub fn add_fn(self: &mut Self, id: c_long, func: fn(pid: &Pid, regs: &user_regs_struct) -> bool) -> &mut Self {
-    self.map.insert(id as SyscallId, SyscallPerm::FilterFn(func));
+  pub fn add_fn(
+    self: &mut Self,
+    id: c_long,
+    func: fn(pid: &Pid, regs: &user_regs_struct) -> bool,
+  ) -> &mut Self {
+    self
+      .map
+      .insert(id as SyscallId, SyscallPerm::FilterFn(func));
     self
   }
 
@@ -79,9 +85,7 @@ impl SyscallFilter {
       let perm = entry.get_mut();
       match perm {
         SyscallPerm::Forbid => false,
-        SyscallPerm::FilterFn(func) => {
-          func(pid, regs)
-        },
+        SyscallPerm::FilterFn(func) => func(pid, regs),
         SyscallPerm::Allow(ref mut count) => {
           if *count == 0 {
             false
@@ -110,15 +114,9 @@ impl SyscallPerm {
 impl Debug for SyscallPerm {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
-      SyscallPerm::Forbid => {
-        f.debug_struct("Forbid").finish()
-      }
-      SyscallPerm::FilterFn(_) => {
-        f.debug_struct("FilterFn").field("func", &"[func]").finish()
-      }
-      SyscallPerm::Allow(count) => {
-        f.debug_tuple("Allow").field(count).finish()
-      }
+      SyscallPerm::Forbid => f.debug_struct("Forbid").finish(),
+      SyscallPerm::FilterFn(_) => f.debug_struct("FilterFn").field("func", &"[func]").finish(),
+      SyscallPerm::Allow(count) => f.debug_tuple("Allow").field(count).finish(),
     }
   }
 }

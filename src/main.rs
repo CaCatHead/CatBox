@@ -1,3 +1,5 @@
+#![rustfmt::skip::attributes(arg)]
+
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
@@ -6,14 +8,15 @@ use clap::{command, Parser, Subcommand};
 use flexi_logger::{DeferredNow, Duplicate, FileSpec, Logger};
 use log::{debug, error, info, Record};
 
+use crate::catbox::run;
 use crate::context::CatBoxParams;
 use crate::preset::make_compile_params;
-use crate::catbox::run;
+use crate::utils::default_format;
 
+mod catbox;
 mod cgroup;
 mod context;
 mod preset;
-mod catbox;
 mod syscall;
 mod utils;
 
@@ -40,14 +43,20 @@ enum Commands {
     #[arg(help = "Arguments")]
     arguments: Vec<String>,
 
-    #[arg(long, default_value = "/dev/null")]
+    #[arg(short = 'i', long, default_value = "/dev/null", help = "Redirect stdin")]
     stdin: String,
 
-    #[arg(long, default_value = "/dev/null")]
+    #[arg(short = 'o', long, default_value = "/dev/null", help = "Redirect stdout")]
     stdout: String,
 
-    #[arg(long, default_value = "/dev/null")]
+    #[arg(short = 'e', long, default_value = "/dev/null", help = "Redirect stderr")]
     stderr: String,
+
+    #[arg(short = 'R', long, help = "Mount read-only directory")]
+    read: Vec<String>,
+
+    #[arg(short = 'W', long, help = "Mount read-write directory")]
+    write: Vec<String>,
   },
 
   #[command(about = "Compile user code")]
@@ -81,9 +90,16 @@ impl Cli {
       Commands::Compile {
         language,
         submission,
-        output
+        output,
       } => make_compile_params(language, submission, output),
-      Commands::Run { program, arguments, stdin, stdout, stderr } => {
+      Commands::Run {
+        program,
+        arguments,
+        stdin,
+        stdout,
+        stderr,
+        ..
+      } => {
         let mut params = CatBoxParams::new(program, arguments);
         params
           .stdin(stdin)
@@ -111,22 +127,6 @@ impl Cli {
   }
 }
 
-/// A logline-formatter that produces log lines like <br>
-/// ```[datetime: INFO] Task successfully read from conf.json```
-pub fn default_format(
-  w: &mut dyn std::io::Write,
-  now: &mut DeferredNow,
-  record: &Record,
-) -> Result<(), std::io::Error> {
-  write!(
-    w,
-    "[{}: {:5}] {}",
-    now.format("%Y-%m-%d %H:%M:%S"),
-    record.level(),
-    record.args()
-  )
-}
-
 fn start(tasks: &Vec<CatBoxParams>) -> Result<(), Box<dyn Error>> {
   for param in tasks {
     run(&param)?;
@@ -135,9 +135,6 @@ fn start(tasks: &Vec<CatBoxParams>) -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-  let cli = Cli::parse();
-  let params = cli.resolve();
-
   Logger::try_with_str("catj=info")?
     .log_to_file(
       FileSpec::default()
@@ -154,6 +151,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     .format_for_files(default_format)
     .print_message()
     .start()?;
+
+  let cli = Cli::parse();
+  let params = cli.resolve();
 
   info!("Start running catbox");
 

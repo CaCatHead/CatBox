@@ -106,8 +106,6 @@ fn set_resource_limit(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   Ok(())
 }
 
-// fn ensure_directory(path: &PathBuf) {}
-
 /// chroot
 fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   debug!("Mount new root: {}", new_root.to_string_lossy());
@@ -128,19 +126,17 @@ fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), Box<dyn 
     None,
   )?;
 
-  // let program_dir = PathBuf::from(&params.program);
-  // let program_dir = program_dir.parent().unwrap();
-  // let program_dir = canonicalize(&program_dir).unwrap();
-  // let mounts = vec![
-  //   vec![MountPoint::read(program_dir.clone(), program_dir.clone())],
-  //   params.mounts.clone(),
-  // ]
-  //   .concat();
-
   for mount_point in &params.mounts {
     if !mount_point.dst().is_absolute() {
       error!(
-        "The dst path {} in mounts should be absolute.",
+        "The dst path {} in mounts should be absolute",
+        mount_point.dst().to_string_lossy()
+      );
+      continue;
+    }
+    if !mount_point.dst().is_dir() {
+      error!(
+        "The dst path {} in mounts should be a directory",
         mount_point.dst().to_string_lossy()
       );
       continue;
