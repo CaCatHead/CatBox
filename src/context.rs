@@ -51,7 +51,7 @@ pub struct CatBoxResult {
 }
 
 impl CatBoxParams {
-  pub fn new(program: String, arguments: Vec<String>) -> Self {
+  pub fn new<PS: Into<String>>(program: PS, arguments: Vec<String>) -> Self {
     let current_user = User::from_uid(Uid::current()).unwrap().unwrap();
     let cgroup = env::var("CATJ_CGROUP").unwrap_or(current_user.name);
 
@@ -61,7 +61,7 @@ impl CatBoxParams {
     CatBoxParams {
       time_limit: 1000,
       memory_limit: 262144,
-      program,
+      program: program.into(),
       arguments,
       uid: catbox_user.uid,
       gid: catbox_group.gid,
@@ -195,10 +195,10 @@ impl CatBoxParams {
       } else {
         match remove_dir_all(&chroot) {
           Ok(_) => {
-            info!("Remov new root: {}", chroot.to_string_lossy())
+            info!("Remove new root: {}", chroot.to_string_lossy());
           }
-          Err(_) => {
-            error!("Fails removing new root: {}", chroot.to_string_lossy())
+          Err(err) => {
+            error!("Fails removing new root: {} ({})", chroot.to_string_lossy(), err);
           }
         }
       }

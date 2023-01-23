@@ -359,6 +359,8 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       let args = args.as_slice();
       let env = get_env(&params);
 
+      info!("Start running program {}", params.program);
+
       // 启动 ptrace 追踪子进程
       if params.ptrace.is_some() {
         ptrace::traceme().unwrap();

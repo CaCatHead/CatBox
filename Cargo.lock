@@ -57,6 +57,7 @@ dependencies = [
  "chrono",
  "clap",
  "flexi_logger",
+ "lazy_static",
  "libc-stdhandle",
  "log",
  "nix 0.26.2",

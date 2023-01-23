@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
@@ -81,7 +84,7 @@ enum Commands {
     submission: String,
 
     #[arg(short, long, help = "Language")]
-    language: String,
+    language: Option<String>,
 
     #[arg(short, long, help = "Output file")]
     output: String,
@@ -114,7 +117,7 @@ impl Cli {
         submission,
         output,
         ..
-      } => make_compile_params(language, submission, output),
+      } => make_compile_params(language, submission, output)?,
       Commands::Run {
         program,
         arguments,
@@ -212,7 +215,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     .append()
     .duplicate_to_stderr(Duplicate::Warn)
     .format_for_files(default_format)
-    .print_message()
     .start()?;
 
   let cli = Cli::parse();
