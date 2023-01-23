@@ -151,6 +151,13 @@ fn set_alarm(params: &CatBoxParams) {
 
 /// 调用 setrlimit
 fn set_resource_limit(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
+  // 运行时限
+  let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as u64;
+  setrlimit(Resource::RLIMIT_CPU, time_limit + 1, time_limit + 1)?;
+
+  // 地址空间无限
+  setrlimit(Resource::RLIMIT_AS, RLIM_INFINITY, RLIM_INFINITY)?;
+
   let stack_size = if params.stack_size == u64::MAX {
     RLIM_INFINITY
   } else {
@@ -158,6 +165,10 @@ fn set_resource_limit(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
   };
   debug!("Set stack size {} bytes", stack_size);
   setrlimit(Resource::RLIMIT_STACK, stack_size, stack_size)?;
+
+  // 输出大小 256 MB
+  let fsize = 256 * 1024 * 1024 as u64;
+  setrlimit(Resource::RLIMIT_FSIZE, fsize, fsize)?;
 
   Ok(())
 }

@@ -10,7 +10,7 @@ catj_group=$(id -gn "${catj_user}")
 
 echo "Register cgroup for ${catj_user}..."
 
-ALL_SUBSYSTEMS=("cpuacct" "memory" "pids")
+ALL_SUBSYSTEMS=("cpu" "cpuacct" "memory" "pids")
 
 for subsystem in "${ALL_SUBSYSTEMS[@]}"; do
   subsystem_dir="/sys/fs/cgroup/${subsystem}/${catj_user}/"
