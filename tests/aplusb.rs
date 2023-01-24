@@ -1,10 +1,9 @@
+use catj::{run, CatBoxParams, CatBoxResult};
 use log::info;
 use std::env::current_dir;
 use std::fs::{self, remove_dir_all, remove_file};
 use std::path::{Path, PathBuf};
 use tempfile::tempdir;
-
-use catj::{run, CatBoxParams, CatBoxResult};
 
 mod common;
 
@@ -123,12 +122,13 @@ fn it_should_run_tle() {
 fn it_should_run_mle() {
   common::setup();
   let result = run_fail_cpp("mle.cpp");
-  info!("mem: {}", result.memory());
   assert!(result.memory() > 262144);
 }
 
-// #[test]
-// fn it_should_not_run_fork() {
-//   setup_logger();
-//   run_cpp("fork.cpp", false);
-// }
+#[test]
+fn it_should_run_fork() {
+  common::setup();
+  let result = run_fail_cpp("fork.cpp");
+  assert_eq!(*result.status(), None);
+  // assert_eq!(*result.signal(), Some(Signal::SIGKILL));
+}

@@ -10,7 +10,6 @@ use tempfile::tempdir;
 
 use crate::syscall::SyscallFilter;
 
-#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct CatBoxParams {
   pub(crate) time_limit: u64,
@@ -34,7 +33,6 @@ pub struct CatBoxParams {
   pub(crate) debug: bool,
 }
 
-#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct MountPoint {
   write: bool,
@@ -43,6 +41,7 @@ pub struct MountPoint {
 }
 
 #[allow(unused)]
+#[derive(Debug, Clone)]
 pub struct CatBoxResult {
   pub(crate) status: Option<i32>,
   pub(crate) signal: Option<Signal>,
@@ -335,6 +334,14 @@ impl MountPoint {
 }
 
 impl CatBoxResult {
+  pub fn status(&self) -> &Option<i32> {
+    &self.status
+  }
+
+  pub fn signal(&self) -> &Option<Signal> {
+    &self.signal
+  }
+
   pub fn time(&self) -> u64 {
     self.time
   }
