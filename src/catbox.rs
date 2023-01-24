@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::ffi::{c_uint, CString};
 use std::fs::create_dir_all;
 
@@ -19,12 +18,13 @@ use nix::unistd::{alarm, chdir, chroot, execvpe, fork, setgid, setuid, ForkResul
 
 use crate::cgroup::CatBoxCgroup;
 use crate::context::CatBoxResult;
+use crate::error::CatBoxError;
 use crate::pipe::CatBoxPipe;
 use crate::utils::into_c_string;
 use crate::CatBoxParams;
 
 /// 重定向输出输出
-fn redirect_io(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
+fn redirect_io(params: &CatBoxParams) -> Result<(), CatBoxError> {
   unsafe {
     if let Some(in_path) = &params.stdin {
       let in_path = into_c_string(&in_path);
@@ -135,7 +135,7 @@ fn set_alarm(params: &CatBoxParams) {
 }
 
 /// 调用 setrlimit
-fn set_resource_limit(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
+fn set_resource_limit(params: &CatBoxParams) -> Result<(), CatBoxError> {
   // 运行时限
   let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as u64;
   setrlimit(Resource::RLIMIT_CPU, time_limit + 1, time_limit + 1)?;
@@ -159,7 +159,7 @@ fn set_resource_limit(params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
 }
 
 /// chroot
-fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), Box<dyn Error>> {
+fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), CatBoxError> {
   info!("Mount new root: {}", new_root.to_string_lossy());
 
   mount::<PathBuf, PathBuf, PathBuf, PathBuf>(
@@ -234,7 +234,7 @@ fn get_env(params: &CatBoxParams) -> Vec<CString> {
   envs
 }
 
-pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
+pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
   let pipe = CatBoxPipe::new()?;
 
   match unsafe { fork() } {
@@ -242,7 +242,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
       let pipe = pipe.read()?;
 
       // 设置 cgroup
-      let cgroup = CatBoxCgroup::new(&params, child);
+      let cgroup = CatBoxCgroup::new(&params, child)?;
 
       // 复制 SyscallFilter
       let mut filter = params.ptrace.clone();
@@ -429,6 +429,6 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, Box<dyn Error>> {
 
       unsafe { libc::_exit(0) };
     }
-    Err(_) => Err(Box::<dyn Error>::from("Fork failed")),
+    Err(err) => Err(CatBoxError::fork(err.to_string())),
   }
 }

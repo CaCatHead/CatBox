@@ -11,6 +11,7 @@ use nix::sys::resource::{getrusage, UsageWho};
 use nix::sys::time::TimeVal;
 use nix::unistd::Pid;
 
+use crate::error::CatBoxError;
 use crate::CatBoxParams;
 
 pub struct CatBoxCgroup {
@@ -29,7 +30,7 @@ pub struct CatBoxUsage {
 }
 
 impl CatBoxCgroup {
-  pub fn new(params: &CatBoxParams, child: Pid) -> Self {
+  pub fn new(params: &CatBoxParams, child: Pid) -> Result<Self, CatBoxError> {
     let hierarchy = cgroups_rs::hierarchies::auto();
 
     let mut enable_cpuacct = hierarchy
@@ -99,12 +100,16 @@ impl CatBoxCgroup {
       Ok(cgroup) => cgroup,
       Err(err) => {
         error!("Build cgroup fails: {}", err);
-        return CatBoxCgroup {
-          name: cgroup_name,
-          cgroup: None,
-          enable_cpuacct: false,
-          enable_memory: false,
-        };
+        if params.force {
+          return Err(CatBoxError::cgroup(err.to_string()));
+        } else {
+          return Ok(CatBoxCgroup {
+            name: cgroup_name,
+            cgroup: None,
+            enable_cpuacct: false,
+            enable_memory: false,
+          });
+        }
       }
     };
     let task = CgroupPid::from(child.as_raw() as u64);
@@ -154,22 +159,42 @@ impl CatBoxCgroup {
       }
     }
 
+    // 默认回退到不使用 cgroup，force 模式下报错
     if !enable_cpuacct {
-      warn!("cgroup cpuacct is not supported");
+      if params.force {
+        return Err(CatBoxError::cgroup("cgroup cpuacct is not supported"));
+      } else {
+        warn!("cgroup cpuacct is not supported");
+      }
     }
     if !enable_memory {
-      warn!("cgroup memory is not supported");
+      if params.force {
+        return Err(CatBoxError::cgroup("cgroup memory is not supported"));
+      } else {
+        warn!("cgroup memory is not supported");
+      }
+    }
+    if !enable_cpu {
+      if params.force {
+        return Err(CatBoxError::cgroup("cgroup cpu is not supported"));
+      } else {
+        warn!("cgroup cpu is not supported");
+      }
     }
     if !enable_pids {
-      warn!("cgroup pids is not supported");
+      if params.force {
+        return Err(CatBoxError::cgroup("cgroup pids is not supported"));
+      } else {
+        warn!("cgroup pids is not supported");
+      }
     }
 
-    CatBoxCgroup {
+    Ok(CatBoxCgroup {
       name: cgroup_name,
       cgroup: Some(cgroup),
       enable_cpuacct,
       enable_memory,
-    }
+    })
   }
 
   fn get_cpuacct(&self) -> Result<CpuAcct, Box<dyn Error>> {
