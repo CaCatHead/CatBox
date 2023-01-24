@@ -1,5 +1,5 @@
 use std::env;
-use std::fs::remove_dir_all;
+use std::fs::{remove_dir_all, canonicalize};
 use std::path::{Path, PathBuf};
 
 use log::{debug, error, info};
@@ -265,22 +265,26 @@ impl MountPoint {
     ]
   }
 
+  fn canonicalize<P: AsRef<Path>>(path: P) -> Result<PathBuf, String> {
+    canonicalize(path).or_else(|e| Err(e.to_string()))
+  }
+
   fn parse(write: bool, text: String) -> Result<Self, String> {
     let arr = text.split(":").collect::<Vec<&str>>();
     if arr.len() == 1 {
       let p = arr.get(0).unwrap();
       Ok(MountPoint {
         write,
-        src: PathBuf::from(p),
-        dst: PathBuf::from(p),
+        src: Self::canonicalize(p)?,
+        dst: Self::canonicalize(p)?,
       })
     } else if arr.len() == 2 {
       let src = arr.get(0).unwrap();
       let dst = arr.get(1).unwrap();
       Ok(MountPoint {
         write,
-        src: PathBuf::from(src),
-        dst: PathBuf::from(dst),
+        src: Self::canonicalize(src)?,
+        dst: Self::canonicalize(dst)?,
       })
     } else {
       Err("Wrong mount string format".to_string())
