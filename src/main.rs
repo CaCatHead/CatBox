@@ -51,6 +51,9 @@ struct Cli {
   #[arg(long, help = "Run in current user")]
   user: bool,
 
+  #[arg(short, long, help = "Force security control")]
+  force: bool,
+
   #[structopt(subcommand)]
   command: Commands,
 }
@@ -185,6 +188,10 @@ impl Cli {
     }
     if let Some(memory) = self.memory {
       command.memory_limit(memory);
+    }
+
+    if self.force {
+      command.force();
     }
 
     if self.user {

@@ -13,10 +13,10 @@ use crate::syscall::SyscallFilter;
 #[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct CatBoxParams {
-  pub time_limit: u64,
-  pub memory_limit: u64,
-  pub program: String,
-  pub arguments: Vec<String>,
+  pub(crate) time_limit: u64,
+  pub(crate) memory_limit: u64,
+  pub(crate) program: String,
+  pub(crate) arguments: Vec<String>,
   pub(crate) uid: Uid,
   pub(crate) gid: Gid,
   pub(crate) cgroup: String,
@@ -30,6 +30,7 @@ pub struct CatBoxParams {
   pub(crate) stdin: Option<String>,
   pub(crate) stdout: Option<String>,
   pub(crate) stderr: Option<String>,
+  pub(crate) force: bool,
   pub(crate) debug: bool,
 }
 
@@ -80,6 +81,7 @@ impl CatBoxParams {
       stdin: None,
       stdout: None,
       stderr: None,
+      force: false,
       debug: false,
     }
   }
@@ -196,6 +198,11 @@ impl CatBoxParams {
   #[allow(unused)]
   pub fn debug(self: &mut Self) -> &mut Self {
     self.debug = true;
+    self
+  }
+
+  pub fn force(self: &mut Self) -> &mut Self {
+    self.force = true;
     self
   }
 
