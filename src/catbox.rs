@@ -422,7 +422,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
 
       let result = execvpe(path, &args, env.as_slice());
       if let Err(e) = result {
-        pipe.write(format!("Execvpe fails: {}", e.desc()))?;
+        pipe.write(format!("Execvpe fails: {} (Errno: {:?})", &e.desc(), &e))?;
 
         error!("Execvpe fails: {}", e.desc());
         info!("Submission path: {}", params.program);
