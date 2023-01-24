@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::error::Error;
 
+use crate::error::CatBoxError;
 use lazy_static::lazy_static;
 
 use super::context::CatBoxParams;
@@ -43,9 +43,9 @@ pub fn make_compile_params(
   language: Option<String>,
   submission: String,
   _output: String,
-) -> Result<CatBoxParams, Box<dyn Error>> {
+) -> Result<CatBoxParams, CatBoxError> {
   let language = detect_language(&language, &submission)
-    .ok_or(Box::<dyn Error>::from("Can not detect submission language"))?;
+    .ok_or(CatBoxError::cli("Can not detect submission language"))?;
 
   match language.as_str() {
     "c" => {

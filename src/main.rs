@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use std::env;
-use std::error::Error;
 use std::path::PathBuf;
 
 use clap::{command, Parser, Subcommand};
@@ -13,6 +12,7 @@ use nix::unistd::isatty;
 
 use crate::catbox::run;
 use crate::context::CatBoxParams;
+use crate::error::CatBoxError;
 use crate::preset::make_compile_params;
 use crate::utils::default_format;
 
@@ -126,7 +126,7 @@ enum Commands {
 }
 
 impl Cli {
-  fn resolve(self) -> Result<Vec<CatBoxParams>, Box<dyn Error>> {
+  fn resolve(self) -> Result<Vec<CatBoxParams>, CatBoxError> {
     let mut command = match self.command {
       Commands::Compile {
         language,
@@ -151,13 +151,13 @@ impl Cli {
         for text in read {
           if let Err(msg) = params.parse_mount_read(text) {
             error!("Parse mount string fails");
-            return Err(Box::<dyn Error>::from(msg));
+            return Err(CatBoxError::cli(msg));
           }
         }
         for text in write {
           if let Err(msg) = params.parse_mount_write(text) {
             error!("Parse mount string fails");
-            return Err(Box::<dyn Error>::from(msg));
+            return Err(CatBoxError::cli(msg));
           }
         }
 
@@ -208,7 +208,7 @@ impl Cli {
     for env in self.env {
       if let Err(msg) = command.parse_env(env) {
         error!("Parse environment variable string fails");
-        return Err(Box::<dyn Error>::from(msg));
+        return Err(CatBoxError::cli(msg));
       }
     }
 
@@ -216,7 +216,7 @@ impl Cli {
   }
 }
 
-fn start(tasks: &Vec<CatBoxParams>) -> Result<Vec<CatBoxResult>, Box<dyn Error>> {
+fn start(tasks: &Vec<CatBoxParams>) -> Result<Vec<CatBoxResult>, CatBoxError> {
   let mut results = vec![];
   for param in tasks {
     let result = run(&param)?;
@@ -225,7 +225,7 @@ fn start(tasks: &Vec<CatBoxParams>) -> Result<Vec<CatBoxResult>, Box<dyn Error>>
   Ok(results)
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), CatBoxError> {
   Logger::try_with_str("catj=info")?
     .log_to_file(
       FileSpec::default()
@@ -302,7 +302,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     Err(err) => {
       error!("Running catj failed");
-      Err(err)
+      Err(err.into())
     }
   }
 }

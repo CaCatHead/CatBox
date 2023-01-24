@@ -335,8 +335,15 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
         }
       };
 
-      let message = pipe.read().ok();
-      info!("Recv message: {:?}", message);
+      if let Ok(message) = pipe.read() {
+        debug!("Recv message: {:?}", message);
+        pipe.close()?;
+        let exec_error = message.strip_prefix("Execvpe fails: ");
+        return Err(match exec_error {
+          Some(msg) => CatBoxError::exec(msg),
+          None => CatBoxError::exec(message),
+        });
+      }
       pipe.close()?;
 
       let usage = cgroup.usage();
@@ -413,8 +420,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
 
       let result = execvpe(path, &args, env.as_slice());
       if let Err(e) = result {
-        let sz = pipe.write(format!("Execvpe fails: {}", e.desc()))?;
-        info!("Write sz: {}", sz);
+        pipe.write(format!("Execvpe fails: {}", e.desc()))?;
 
         error!("Execvpe fails: {}", e.desc());
         info!("Submission path: {}", params.program);
