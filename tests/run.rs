@@ -8,7 +8,7 @@ mod common;
 fn it_should_echo() {
   common::setup();
   let text = String::from("123");
-  let output_path = "./logs/echo.txt";
+  let output_path = "./echo.out";
 
   let mut params = CatBoxParams::new("echo", vec![text.clone()]);
   params.stdout(Some(output_path));

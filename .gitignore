@@ -3,6 +3,7 @@
 
 # Build Output
 /target
+*.out
 
 # Logs
 logs
