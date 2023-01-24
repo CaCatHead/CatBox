@@ -249,18 +249,14 @@ fn bootstrap() -> Result<(), CatBoxError> {
   let json_format = cli.json;
   let params = cli.resolve()?;
 
-  let result = start(&params);
-  for param in params {
-    param.close();
-  }
-
-  match result {
+  let result = match start(&params) {
     Ok(results) => {
       info!("Running catj finished");
       if report {
         if results.len() == 1 {
           let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
-
+          
+          let param = params.get(0).unwrap();
           let result = results.first().unwrap();
 
           if json_format || !is_tty {
@@ -289,23 +285,36 @@ fn bootstrap() -> Result<(), CatBoxError> {
               || "\x1b[92m✓\x1b[39m".to_string(),
               |v| format!("\x1b[91m{}\x1b[39m", v),
             );
-
+            
+            // 没有重定向输入输出，添加一个空行
+            if param.stdout.is_none() && param.stderr.is_none() {
+              println!("");
+            }
             println!("\x1b[1mStatus\x1b[22m     {}", status);
             println!("\x1b[1mSignal\x1b[22m     {}", signal);
             println!("\x1b[1mTime\x1b[22m       {} ms", result.time);
             println!("\x1b[1mTime user\x1b[22m  {} ms", result.time_user);
             println!("\x1b[1mTime sys\x1b[22m   {} ms", result.time_sys);
             println!("\x1b[1mMemory\x1b[22m     {} KB", result.memory);
+            println!();
           }
         }
       }
+      
       Ok(())
     }
     Err(err) => {
       error!("Running catj failed: {}", err);
+
       Err(err)
     }
+  };
+
+  for param in params {
+    param.close();
   }
+
+  result
 }
 
 fn main() -> CatBoxExit {
