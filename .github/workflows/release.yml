@@ -22,6 +22,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
+    name: ${{ matrix.target }}
+  
     runs-on: ${{ matrix.os }}
 
     strategy:
