@@ -22,6 +22,9 @@ A light process isolation sandbox used for Competitive Programming contest.
 # Install using cargo
 $ cargo install catj
 
+# Download binary with installation script
+$ curl -fsSL https://bina.egoist.sh/yjl9903/CatBox | sh
+
 # Check installation
 $ catj --version
 catj 0.1.3
