@@ -24,7 +24,7 @@ $ cargo install catj
 
 # Check installation
 $ catj --version
-catj 0.1.2
+catj 0.1.3
 
 # Init cgroup for current user
 $ ./init.sh $USER
