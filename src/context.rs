@@ -333,3 +333,21 @@ impl MountPoint {
     &self.dst
   }
 }
+
+impl CatBoxResult {
+  pub fn time(&self) -> u64 {
+    self.time
+  }
+
+  pub fn time_user(&self) -> u64 {
+    self.time_user
+  }
+
+  pub fn time_sys(&self) -> u64 {
+    self.time_sys
+  }
+
+  pub fn memory(&self) -> u64 {
+    self.memory
+  }
+}

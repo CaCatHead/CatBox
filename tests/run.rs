@@ -9,12 +9,11 @@ fn it_should_echo() {
   common::setup();
   let text = String::from("123");
   let output_path = "./logs/echo.txt";
-  
+
   let mut params = CatBoxParams::new("echo", vec![text.clone()]);
-  params
-    .stdout(Some(output_path));
+  params.stdout(Some(output_path));
   run(&params).unwrap();
-  
+
   let output = fs::read_to_string(output_path).unwrap();
   assert_eq!(output.trim(), text)
 }

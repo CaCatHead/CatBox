@@ -3,7 +3,7 @@ use std::error::Error;
 use cgroups_rs::cgroup_builder::CgroupBuilder;
 use cgroups_rs::cpu::CpuController;
 use cgroups_rs::cpuacct::{CpuAcct, CpuAcctController};
-use cgroups_rs::memory::{MemController, MemSwap};
+use cgroups_rs::memory::{MemController, MemSwap, Memory};
 use cgroups_rs::pid::PidController;
 use cgroups_rs::{Cgroup, CgroupPid, Controller, MaxValue};
 use log::{debug, error, warn};
@@ -26,7 +26,7 @@ pub struct CatBoxUsage {
   time: u64,
   time_user: u64,
   time_sys: u64,
-  memory_swap: u64,
+  memory: u64,
 }
 
 impl CatBoxCgroup {
@@ -218,7 +218,7 @@ impl CatBoxCgroup {
     }
   }
 
-  fn get_memory(&self) -> Result<MemSwap, Box<dyn Error>> {
+  fn get_memory(&self) -> Result<(Memory, MemSwap), Box<dyn Error>> {
     if self.enable_memory {
       match &self.cgroup {
         None => Err(Box::<dyn Error>::from("cgroup is None")),
@@ -226,10 +226,12 @@ impl CatBoxCgroup {
           let memory: &MemController = cgroup
             .controller_of()
             .ok_or(Box::<dyn Error>::from("Get memory controller fails"))?;
+          let mem = memory.memory_stat();
+          debug!("mem.max_usage_in_bytes: {}", mem.max_usage_in_bytes);
           let memswap = memory.memswap();
           debug!("memswap.max_usage_in_bytes: {}", memswap.max_usage_in_bytes);
           memory.reset_max_usage()?;
-          Ok(memswap)
+          Ok((mem, memswap))
         }
       }
     } else {
@@ -261,8 +263,10 @@ impl CatBoxCgroup {
       }
     };
 
-    let memory_swap = match self.get_memory() {
-      Ok(memswap) => memswap.max_usage_in_bytes / 1024,
+    let memory = match self.get_memory() {
+      Ok((mem, memswap)) => {
+        std::cmp::max(mem.max_usage_in_bytes, memswap.max_usage_in_bytes) / 1024
+      }
       Err(_) => {
         let usage = rusage.unwrap_or_else(|| getrusage(UsageWho::RUSAGE_CHILDREN).unwrap());
         debug!("usage.max_rss: {}", usage.max_rss());
@@ -274,7 +278,7 @@ impl CatBoxCgroup {
       time,
       time_user,
       time_sys,
-      memory_swap,
+      memory,
     }
   }
 }
@@ -301,8 +305,8 @@ impl CatBoxUsage {
     self.time_sys
   }
 
-  pub fn memory_swap(&self) -> u64 {
-    self.memory_swap
+  pub fn memory(&self) -> u64 {
+    self.memory
   }
 }
 

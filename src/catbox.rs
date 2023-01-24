@@ -369,7 +369,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
         time: usage.time(),
         time_user: usage.time_user(),
         time_sys: usage.time_sys(),
-        memory: usage.memory_swap(),
+        memory: usage.memory(),
       })
     }
     Ok(ForkResult::Child) => {
