@@ -24,6 +24,7 @@ $ cargo install catj
 
 # Check installation
 $ catj --version
+catj 0.1.2
 
 # Init cgroup for current user
 $ ./init.sh $USER
@@ -36,10 +37,19 @@ $ ./init.sh $USER
 $ catj compile ./fixtures/aplusb/source/ac.cpp -o a.out
 
 # Run a.out
-$ catj run --stdin ./fixtures/aplusb/testcases/1.in -- ./a.out
+$ catj run --stdin ./fixtures/aplusb/testcases/1.in --read . -- ./a.out
+2
 
 # Generate report
-$ catj --report run --stdin ./fixtures/aplusb/testcases/1.in --stdout ./sub.out -- ./a.out
+$ catj --report run --stdin ./fixtures/aplusb/testcases/1.in --stdout ./sub.out --read . -- ./a.out
+# or
+$ catj -r run -i ./fixtures/aplusb/testcases/1.in -o ./sub.out -R . -- ./a.out
+Status     0
+Signal     ✓
+Time       1 ms
+Time user  1 ms
+Time sys   0 ms
+Memory     0 KB
 ```
 
 ## License
