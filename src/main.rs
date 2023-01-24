@@ -301,8 +301,8 @@ fn main() -> Result<(), CatBoxError> {
       Ok(())
     }
     Err(err) => {
-      error!("Running catj failed");
-      Err(err.into())
+      error!("Running catj failed: {}", err);
+      Err(err)
     }
   }
 }

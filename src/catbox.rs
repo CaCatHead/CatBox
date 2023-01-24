@@ -336,13 +336,15 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
       };
 
       if let Ok(message) = pipe.read() {
-        debug!("Recv message: {:?}", message);
-        pipe.close()?;
-        let exec_error = message.strip_prefix("Execvpe fails: ");
-        return Err(match exec_error {
-          Some(msg) => CatBoxError::exec(msg),
-          None => CatBoxError::exec(message),
-        });
+        if message.len() > 0 {
+          debug!("Recv message: {:?}", message);
+          pipe.close()?;
+          let exec_error = message.strip_prefix("Execvpe fails: ");
+          return Err(match exec_error {
+            Some(msg) => CatBoxError::exec(msg),
+            None => CatBoxError::exec(message),
+          });
+        }
       }
       pipe.close()?;
 
