@@ -133,6 +133,11 @@ impl CatBoxParams {
     self
   }
 
+  pub fn cwd<P: Into<PathBuf>>(self: &mut Self, path: P) -> &mut Self {
+    self.cwd = path.into();
+    self
+  }
+
   pub fn chroot(self: &mut Self, enable: bool) -> &mut Self {
     if enable {
       let temp = tempdir().unwrap();

@@ -218,7 +218,14 @@ fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), CatBoxEr
   }
 
   chroot(new_root)?;
-  chdir(Path::new("/"))?;
+
+  let cwd = &params.cwd;
+  if cwd.exists() {
+    chdir(cwd.as_path())?;
+  } else {
+    error!("Chdir fails: path {} does not exisit when ", cwd.to_string_lossy());
+    chdir(Path::new("/"))?;
+  }
 
   Ok(())
 }

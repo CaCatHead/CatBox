@@ -50,6 +50,7 @@ fn run_cpp(file: &str, ok: bool) {
       .stdin(Some(sub_in.clone()))
       .stdout(Some(sub_out.clone()))
       .chroot(true)
+      .cwd("/")
       .mount_read(&dir, &dir);
     run(&params).unwrap();
 
@@ -107,7 +108,7 @@ fn it_should_echo() {
   let mut params = CatBoxParams::new("echo", vec!["123".to_string()]);
   params
     // .debug()
-    .stdout(Some("a.txt"));
+    .stdout(Some("./logs/echo.txt"));
   run(&params).unwrap();
 }
 
