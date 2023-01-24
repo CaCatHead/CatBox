@@ -10,6 +10,7 @@ use tempfile::tempdir;
 
 use crate::syscall::SyscallFilter;
 
+/// CatBox running params that can config its behavior
 #[derive(Debug, Clone)]
 pub struct CatBoxParams {
   pub(crate) time_limit: u64,
@@ -40,6 +41,7 @@ pub struct MountPoint {
   dst: PathBuf,
 }
 
+/// CatBox running result
 #[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct CatBoxResult {

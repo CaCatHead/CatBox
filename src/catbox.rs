@@ -244,6 +244,7 @@ fn get_env(params: &CatBoxParams) -> Vec<CString> {
   envs
 }
 
+/// Run process isolation sandbox
 pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
   let pipe = CatBoxPipe::new()?;
 

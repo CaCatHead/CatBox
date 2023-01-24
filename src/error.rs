@@ -7,13 +7,21 @@ use std::{
 use flexi_logger::FlexiLoggerError;
 use nix::{errno::Errno, libc::STDOUT_FILENO, unistd::isatty};
 
+/// CatBox Error
 pub enum CatBoxError {
+  /// Fork child process failed.
   Fork(String),
+  /// Create cgroup failed.
   Cgroup(String),
+  /// Exec child process failed.
   Exec(String),
+  /// Error releated to nix.
   Nix(Errno),
+  /// Errors releated to file system.
   Fs(String),
+  /// Parse CLI arguements failed.
   Cli(String),
+  /// Logger creation failed.
   Logger(FlexiLoggerError),
 }
 
