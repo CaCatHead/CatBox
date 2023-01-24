@@ -223,7 +223,10 @@ fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), CatBoxEr
   if cwd.exists() {
     chdir(cwd.as_path())?;
   } else {
-    error!("Chdir fails: path {} does not exisit when ", cwd.to_string_lossy());
+    error!(
+      "Chdir fails: path {} does not exisit when ",
+      cwd.to_string_lossy()
+    );
     chdir(Path::new("/"))?;
   }
 
@@ -253,6 +256,8 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
 
       // 复制 SyscallFilter
       let mut filter = params.ptrace.clone();
+
+      debug!("Start waiting for child process");
 
       let (status, signal) = loop {
         let status = waitpid(child, None)?;

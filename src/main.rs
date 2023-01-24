@@ -255,7 +255,7 @@ fn bootstrap() -> Result<(), CatBoxError> {
       if report {
         if results.len() == 1 {
           let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
-          
+
           let param = params.get(0).unwrap();
           let result = results.first().unwrap();
 
@@ -285,7 +285,7 @@ fn bootstrap() -> Result<(), CatBoxError> {
               || "\x1b[92m✓\x1b[39m".to_string(),
               |v| format!("\x1b[91m{}\x1b[39m", v),
             );
-            
+
             // 没有重定向输入输出，添加一个空行
             if param.stdout.is_none() && param.stderr.is_none() {
               println!("");
@@ -300,7 +300,7 @@ fn bootstrap() -> Result<(), CatBoxError> {
           }
         }
       }
-      
+
       Ok(())
     }
     Err(err) => {

@@ -1,5 +1,5 @@
 use std::env;
-use std::fs::{remove_dir_all, canonicalize};
+use std::fs::{canonicalize, remove_dir_all};
 use std::path::{Path, PathBuf};
 
 use log::{debug, error, info};
@@ -258,6 +258,7 @@ impl MountPoint {
   pub fn defaults() -> Vec<Self> {
     vec![
       Self::read(PathBuf::from("/bin"), PathBuf::from("/bin")),
+      Self::read(PathBuf::from("/sbin"), PathBuf::from("/sbin")),
       Self::read(PathBuf::from("/usr"), PathBuf::from("/usr")),
       Self::read(PathBuf::from("/etc"), PathBuf::from("/etc")),
       Self::read(PathBuf::from("/lib"), PathBuf::from("/lib")),
@@ -265,8 +266,13 @@ impl MountPoint {
     ]
   }
 
-  fn canonicalize<P: AsRef<Path>>(path: P) -> Result<PathBuf, String> {
-    canonicalize(path).or_else(|e| Err(e.to_string()))
+  fn canonicalize<PS: Into<PathBuf>>(path: PS) -> Result<PathBuf, String> {
+    let path: PathBuf = path.into();
+    if path.is_absolute() {
+      Ok(path)
+    } else {
+      canonicalize(path).or_else(|e| Err(e.to_string()))
+    }
   }
 
   fn parse(write: bool, text: String) -> Result<Self, String> {
@@ -283,8 +289,8 @@ impl MountPoint {
       let dst = arr.get(1).unwrap();
       Ok(MountPoint {
         write,
-        src: Self::canonicalize(src)?,
-        dst: Self::canonicalize(dst)?,
+        src: Self::canonicalize(*src)?,
+        dst: Self::canonicalize(*dst)?,
       })
     } else {
       Err("Wrong mount string format".to_string())
@@ -302,16 +308,16 @@ impl MountPoint {
   pub fn read(src: PathBuf, dst: PathBuf) -> Self {
     MountPoint {
       write: false,
-      src,
-      dst,
+      src: Self::canonicalize(src).unwrap(),
+      dst: Self::canonicalize(dst).unwrap(),
     }
   }
 
   pub fn write(src: PathBuf, dst: PathBuf) -> Self {
     MountPoint {
       write: true,
-      src,
-      dst,
+      src: Self::canonicalize(src).unwrap(),
+      dst: Self::canonicalize(dst).unwrap(),
     }
   }
 
