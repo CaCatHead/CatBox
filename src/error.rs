@@ -1,10 +1,11 @@
 use std::{
   error::Error,
   fmt::{Debug, Display},
+  process::{ExitCode, Termination},
 };
 
 use flexi_logger::FlexiLoggerError;
-use nix::errno::Errno;
+use nix::{errno::Errno, libc::STDOUT_FILENO, unistd::isatty};
 
 pub enum CatBoxError {
   Fork(String),
@@ -14,6 +15,12 @@ pub enum CatBoxError {
   Fs(String),
   Cli(String),
   Logger(FlexiLoggerError),
+}
+
+#[allow(unused)]
+pub enum CatBoxExit {
+  Ok,
+  Err(CatBoxError),
 }
 
 impl CatBoxError {
@@ -73,3 +80,32 @@ impl From<FlexiLoggerError> for CatBoxError {
 }
 
 impl Error for CatBoxError {}
+
+impl Termination for CatBoxExit {
+  fn report(self) -> ExitCode {
+    match self {
+      CatBoxExit::Ok => ExitCode::SUCCESS.report(),
+      CatBoxExit::Err(err) => {
+        let text = format!("{}", err);
+        let text = match text.split_once(": ") {
+          Some((prefix, message)) => {
+            let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
+            if is_tty {
+              format!("\x1b[1m\x1b[91m{}\x1b[39m\x1b[22m  {}", prefix, message)
+            } else {
+              format!(
+                "{{\n  \"ok\": false,\n  \"type\": \"{}\",\n  \"message\": \"{}\"\n}}",
+                prefix, message
+              )
+            }
+          }
+          None => {
+            format!("{}", err)
+          }
+        };
+        eprintln!("{}", text);
+        ExitCode::FAILURE.report()
+      }
+    }
+  }
+}

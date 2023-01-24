@@ -12,7 +12,7 @@ use nix::unistd::isatty;
 
 use crate::catbox::run;
 use crate::context::CatBoxParams;
-use crate::error::CatBoxError;
+use crate::error::{CatBoxError, CatBoxExit};
 use crate::preset::make_compile_params;
 use crate::utils::default_format;
 
@@ -216,16 +216,16 @@ impl Cli {
   }
 }
 
-fn start(tasks: &Vec<CatBoxParams>) -> Result<Vec<CatBoxResult>, CatBoxError> {
+fn start(params: &Vec<CatBoxParams>) -> Result<Vec<CatBoxResult>, CatBoxError> {
   let mut results = vec![];
-  for param in tasks {
+  for param in params {
     let result = run(&param)?;
     results.push(result);
   }
   Ok(results)
 }
 
-fn main() -> Result<(), CatBoxError> {
+fn bootstrap() -> Result<(), CatBoxError> {
   Logger::try_with_str("catj=info")?
     .log_to_file(
       FileSpec::default()
@@ -242,12 +242,12 @@ fn main() -> Result<(), CatBoxError> {
     .format_for_files(default_format)
     .start()?;
 
+  info!("Start running catj");
+
   let cli = Cli::parse();
   let report = cli.report;
   let json_format = cli.json;
   let params = cli.resolve()?;
-
-  info!("Start running catj");
 
   let result = start(&params);
   for param in params {
@@ -272,6 +272,7 @@ fn main() -> Result<(), CatBoxError> {
               .map_or_else(|| "null".to_string(), |v| format!("\"{}\"", v));
 
             println!("{{");
+            println!("  \"ok\": true,");
             println!("  \"status\": {},", status);
             println!("  \"signal\": {},", signal);
             println!("  \"time\": {},", result.time);
@@ -304,5 +305,12 @@ fn main() -> Result<(), CatBoxError> {
       error!("Running catj failed: {}", err);
       Err(err)
     }
+  }
+}
+
+fn main() -> CatBoxExit {
+  match bootstrap() {
+    Ok(_) => CatBoxExit::Ok,
+    Err(err) => CatBoxExit::Err(err),
   }
 }
