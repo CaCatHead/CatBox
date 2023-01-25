@@ -257,6 +257,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
 
       // 复制 SyscallFilter
       let mut filter = params.ptrace.clone();
+      let mut last_signal: Option<Signal> = None;
 
       debug!("Start waiting for child process");
 
@@ -266,7 +267,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
         match status {
           WaitStatus::Exited(pid, status) => {
             info!("Child process #{}. exited with status {}", pid, status);
-            break (Some(status), None);
+            break (Some(status), last_signal);
           }
           WaitStatus::Signaled(pid, signal, _) => {
             info!("Child process #{}. is signaled by {}", pid, signal);
@@ -282,6 +283,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
                   pid, signal
                 );
                 ptrace::kill(pid)?;
+                last_signal = Some(signal);
                 break (None, Some(signal));
               }
               // 处理系统调用
@@ -308,8 +310,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
                 }
               }
               // 因为各种原因 RE
-              Signal::SIGKILL
-              | Signal::SIGBUS
+              Signal::SIGBUS
               | Signal::SIGFPE
               | Signal::SIGILL
               | Signal::SIGSEGV
@@ -317,6 +318,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
               | Signal::SIGXFSZ => {
                 info!("Child process #{}. is stopped by {}", pid, signal);
                 ptrace::kill(pid)?;
+                last_signal = Some(signal);
                 break (None, Some(signal));
               }
               // 未捕获 SIGCONT，不是终端

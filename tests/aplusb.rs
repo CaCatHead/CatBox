@@ -199,7 +199,7 @@ fn it_should_not_run_while1() {
 #[test]
 fn it_should_not_run_output_size() {
   common::setup();
-  let result = run_fail_cpp("output_size.c", 5000, 262144);
+  let result = run_fail_cpp("output_size.c", 10 * 1000, 262144);
   assert_eq!(*result.status(), None);
   assert_eq!(*result.signal(), Some(Signal::SIGXFSZ));
 }
