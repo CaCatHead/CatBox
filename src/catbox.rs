@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use libc_stdhandle::{stderr, stdin, stdout};
 use log::{debug, error, info};
 
-use nix::libc::RLIM_INFINITY;
 use nix::libc::{self, freopen};
 use nix::mount::{mount, MsFlags};
 use nix::sys::ptrace;
@@ -141,10 +140,14 @@ fn set_resource_limit(params: &CatBoxParams) -> Result<(), CatBoxError> {
   setrlimit(Resource::RLIMIT_CPU, time_limit + 1, time_limit + 1)?;
 
   // 地址空间无限
-  setrlimit(Resource::RLIMIT_AS, RLIM_INFINITY, RLIM_INFINITY)?;
+  setrlimit(
+    Resource::RLIMIT_AS,
+    libc::RLIM_INFINITY,
+    libc::RLIM_INFINITY,
+  )?;
 
   let stack_size = if params.stack_size == u64::MAX {
-    RLIM_INFINITY
+    libc::RLIM_INFINITY
   } else {
     params.stack_size
   };
@@ -377,6 +380,14 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
     Ok(ForkResult::Child) => {
       info!("Child process is running");
 
+      unsafe {
+        let r = libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM);
+        if r == -1 {
+          libc::_exit(1);
+        }
+        // parent process may have been dead
+      }
+
       let pipe = pipe.write()?;
 
       // 重定向输入输出
@@ -449,7 +460,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
         pipe.close()?;
       }
 
-      unsafe { libc::_exit(0) };
+      unsafe { libc::_exit(1) };
     }
     Err(err) => Err(CatBoxError::fork(err.to_string())),
   }

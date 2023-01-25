@@ -1,9 +1,9 @@
 use catj::{run, CatBoxParams, CatBoxResult};
 use log::info;
+use nix::sys::signal::Signal;
 use std::env::current_dir;
 use std::fs::{self, remove_dir_all, remove_file};
 use std::path::{Path, PathBuf};
-use nix::sys::signal::Signal;
 use tempfile::tempdir;
 
 mod common;
@@ -16,7 +16,11 @@ fn compile_cpp(dir: &PathBuf, file: &String) -> String {
   let executable = dir.join("Main.out");
   let executable = executable.to_string_lossy();
 
-  let program = if source.ends_with(".cpp") { String::from("g++") } else { String::from("gcc") };
+  let program = if source.ends_with(".cpp") {
+    String::from("g++")
+  } else {
+    String::from("gcc")
+  };
   let arguments = vec![
     source.to_string(),
     String::from("-o"),
@@ -42,7 +46,13 @@ fn compile_cpp(dir: &PathBuf, file: &String) -> String {
   executable.to_string()
 }
 
-fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool, time: u64, memory: u64) -> Option<(String, CatBoxResult)> {
+fn run_aplusb(
+  dir: &PathBuf,
+  executable: &String,
+  ok: bool,
+  time: u64,
+  memory: u64,
+) -> Option<(String, CatBoxResult)> {
   for i in 1..4 {
     let sub_in = PathBuf::from(format!("./fixtures/aplusb/testcases/{}.in", i));
     let sub_in = sub_in.to_string_lossy().to_string();
@@ -234,4 +244,3 @@ fn it_should_not_run_re2() {
   assert_eq!(*result.status(), None);
   assert_eq!(*result.signal(), Some(Signal::SIGSEGV));
 }
-
