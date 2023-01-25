@@ -3,6 +3,7 @@ use log::info;
 use std::env::current_dir;
 use std::fs::{self, remove_dir_all, remove_file};
 use std::path::{Path, PathBuf};
+use nix::sys::signal::Signal;
 use tempfile::tempdir;
 
 mod common;
@@ -27,8 +28,8 @@ fn compile_cpp(dir: &PathBuf, file: &String) -> String {
   params
     .time_limit(10 * 1000)
     .stdin(Some("/dev/null"))
-    .stdout(Some("/dev/null"))
-    .stderr(Some("/dev/null"))
+    // .stdout(Some("/dev/null"))
+    // .stderr(Some("/dev/null"))
     .chroot(true)
     .current_user()
     .ptrace(None)
@@ -80,22 +81,6 @@ fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool) -> Option<CatBoxResu
   None
 }
 
-#[test]
-fn it_should_run_cpp_ac() {
-  common::setup();
-
-  let file = "ac.cpp".to_string();
-  let dir = tempdir().unwrap();
-  let dir = dir.into_path();
-
-  info!("Start running {} at {}", file, dir.to_string_lossy());
-  let executable = compile_cpp(&dir, &file);
-  info!("Compile {} -> {} ok", &file, &executable);
-  run_aplusb(&dir, &executable, true);
-  info!("Running {} ok at {}", &file, dir.to_string_lossy());
-  remove_dir_all(dir).unwrap();
-}
-
 fn run_fail_cpp(file: &str) -> CatBoxResult {
   let file = file.to_string();
   let dir = tempdir().unwrap();
@@ -111,24 +96,57 @@ fn run_fail_cpp(file: &str) -> CatBoxResult {
   result
 }
 
+fn run_ok_cpp(file: &str) {
+  let file = file.to_string();
+  let dir = tempdir().unwrap();
+  let dir = dir.into_path();
+
+  info!("Start running {} at {}", file, dir.to_string_lossy());
+  let executable = compile_cpp(&dir, &file);
+  info!("Compile {} -> {} ok", &file, &executable);
+  let result = run_aplusb(&dir, &executable, true);
+  assert!(result.is_none());
+  info!("Running {} ok at {}", &file, dir.to_string_lossy());
+  remove_dir_all(dir).unwrap();
+}
+
 #[test]
-fn it_should_run_tle() {
+fn it_should_run_cpp_ac() {
+  common::setup();
+  run_ok_cpp("ac.cpp");
+}
+
+#[test]
+fn it_should_run_small_stack() {
+  common::setup();
+  run_ok_cpp("small_stack.cpp");
+}
+
+#[test]
+fn it_should_not_run_tle() {
   common::setup();
   let result = run_fail_cpp("tle.cpp");
   assert!(result.time() > 1000);
 }
 
 #[test]
-fn it_should_run_mle() {
+fn it_should_not_run_mle() {
   common::setup();
   let result = run_fail_cpp("mle.cpp");
   assert!(result.memory() > 262144);
 }
 
 #[test]
-fn it_should_run_fork() {
+fn it_should_not_run_fork() {
   common::setup();
   let result = run_fail_cpp("fork.cpp");
   assert_eq!(*result.status(), None);
-  // assert_eq!(*result.signal(), Some(Signal::SIGKILL));
+  assert_eq!(*result.signal(), Some(Signal::SIGKILL));
+}
+
+#[test]
+fn it_should_not_run_big_stack() {
+  common::setup();
+  let result = run_fail_cpp("big_stack.cpp");
+  assert!(result.memory() > 262144);
 }
