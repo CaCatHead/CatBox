@@ -42,7 +42,7 @@ fn compile_cpp(dir: &PathBuf, file: &String) -> String {
   executable.to_string()
 }
 
-fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool, time: u64, memory: u64) -> Option<CatBoxResult> {
+fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool, time: u64, memory: u64) -> Option<(String, CatBoxResult)> {
   for i in 1..4 {
     let sub_in = PathBuf::from(format!("./fixtures/aplusb/testcases/{}.in", i));
     let sub_in = sub_in.to_string_lossy().to_string();
@@ -58,6 +58,7 @@ fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool, time: u64, memory: u
       .stdout(Some(sub_out.clone()))
       .stderr(Some("/dev/null"))
       .chroot(true)
+      .env("ONLINE_JUDGE", "true")
       .cwd("/")
       .mount_read(&dir, &dir);
     let result = run(&params).unwrap();
@@ -77,7 +78,7 @@ fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool, time: u64, memory: u
       info!("Testcase #{}. ans: {}", i, ans.trim_end());
       assert_eq!(out, ans);
     } else {
-      return Some(result);
+      return Some((out, result));
     }
   }
   None
@@ -91,9 +92,24 @@ fn run_fail_cpp(file: &str, time: u64, memory: u64) -> CatBoxResult {
   info!("Start running {} at {}", file, dir.to_string_lossy());
   let executable = compile_cpp(&dir, &file);
   info!("Compile {} -> {} ok", &file, &executable);
+  let (_, result) = run_aplusb(&dir, &executable, false, time, memory).unwrap();
+  info!("Running {} ok at {}", &file, dir.to_string_lossy());
+  remove_dir_all(dir).unwrap();
+
+  result
+}
+
+fn run_fail_cpp_stdout(file: &str, time: u64, memory: u64) -> (String, CatBoxResult) {
+  let file = file.to_string();
+  let dir = tempdir().unwrap();
+  let dir = dir.into_path();
+
+  info!("Start running {} at {}", file, dir.to_string_lossy());
+  let executable = compile_cpp(&dir, &file);
+  info!("Compile {} -> {} ok", &file, &executable);
   let result = run_aplusb(&dir, &executable, false, time, memory).unwrap();
   info!("Running {} ok at {}", &file, dir.to_string_lossy());
-  // remove_dir_all(dir).unwrap();
+  remove_dir_all(dir).unwrap();
 
   result
 }
@@ -141,6 +157,14 @@ fn it_should_not_run_mle() {
 }
 
 #[test]
+fn it_should_not_run_malloc() {
+  common::setup();
+  let result = run_fail_cpp("malloc.c", 1000, 262144);
+  assert_eq!(*result.status(), None);
+  assert!(result.memory() > 262144);
+}
+
+#[test]
 fn it_should_not_run_big_stack() {
   common::setup();
   let result = run_fail_cpp("big_stack.cpp", 1000, 262144);
@@ -179,3 +203,35 @@ fn it_should_not_run_output_size() {
   assert_eq!(*result.status(), None);
   assert_eq!(*result.signal(), Some(Signal::SIGXFSZ));
 }
+
+#[test]
+fn it_should_run_uid() {
+  common::setup();
+  let (_, result) = run_fail_cpp_stdout("uid.c", 1000, 262144);
+  assert_eq!(*result.status(), Some(0));
+}
+
+#[test]
+fn it_should_not_run_env() {
+  common::setup();
+  std::env::set_var("test", "value");
+  let (text, result) = run_fail_cpp_stdout("env.c", 1000, 262144);
+  assert_eq!(text.trim_end(), "true,null");
+  assert_eq!(*result.status(), Some(0));
+}
+
+#[test]
+fn it_should_not_run_re1() {
+  common::setup();
+  let result = run_fail_cpp("re1.c", 1000, 262144);
+  assert_eq!(*result.status(), Some(42));
+}
+
+#[test]
+fn it_should_not_run_re2() {
+  common::setup();
+  let result = run_fail_cpp("re2.c", 1000, 262144);
+  assert_eq!(*result.status(), None);
+  assert_eq!(*result.signal(), Some(Signal::SIGSEGV));
+}
+
