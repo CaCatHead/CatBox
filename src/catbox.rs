@@ -317,6 +317,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
               | Signal::SIGXFSZ => {
                 info!("Child process #{}. is stopped by {}", pid, signal);
                 ptrace::kill(pid)?;
+                break (None, Some(signal));
               }
               // 未捕获 SIGCONT，不是终端
               Signal::SIGCONT | Signal::SIGHUP | Signal::SIGINT => {

@@ -16,7 +16,7 @@ fn compile_cpp(dir: &PathBuf, file: &String) -> String {
   let executable = dir.join("Main.out");
   let executable = executable.to_string_lossy();
 
-  let program = String::from("g++");
+  let program = if source.ends_with(".cpp") { String::from("g++") } else { String::from("gcc") };
   let arguments = vec![
     source.to_string(),
     String::from("-o"),
@@ -42,7 +42,7 @@ fn compile_cpp(dir: &PathBuf, file: &String) -> String {
   executable.to_string()
 }
 
-fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool) -> Option<CatBoxResult> {
+fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool, time: u64, memory: u64) -> Option<CatBoxResult> {
   for i in 1..4 {
     let sub_in = PathBuf::from(format!("./fixtures/aplusb/testcases/{}.in", i));
     let sub_in = sub_in.to_string_lossy().to_string();
@@ -52,6 +52,8 @@ fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool) -> Option<CatBoxResu
     let mut params = CatBoxParams::new(executable.clone(), vec![]);
     params
       // .debug()
+      .time_limit(time)
+      .memory_limit(memory)
       .stdin(Some(sub_in.clone()))
       .stdout(Some(sub_out.clone()))
       .stderr(Some("/dev/null"))
@@ -81,7 +83,7 @@ fn run_aplusb(dir: &PathBuf, executable: &String, ok: bool) -> Option<CatBoxResu
   None
 }
 
-fn run_fail_cpp(file: &str) -> CatBoxResult {
+fn run_fail_cpp(file: &str, time: u64, memory: u64) -> CatBoxResult {
   let file = file.to_string();
   let dir = tempdir().unwrap();
   let dir = dir.into_path();
@@ -89,14 +91,14 @@ fn run_fail_cpp(file: &str) -> CatBoxResult {
   info!("Start running {} at {}", file, dir.to_string_lossy());
   let executable = compile_cpp(&dir, &file);
   info!("Compile {} -> {} ok", &file, &executable);
-  let result = run_aplusb(&dir, &executable, false).unwrap();
+  let result = run_aplusb(&dir, &executable, false, time, memory).unwrap();
   info!("Running {} ok at {}", &file, dir.to_string_lossy());
-  remove_dir_all(dir).unwrap();
+  // remove_dir_all(dir).unwrap();
 
   result
 }
 
-fn run_ok_cpp(file: &str) {
+fn run_ok_cpp(file: &str, time: u64, memory: u64) {
   let file = file.to_string();
   let dir = tempdir().unwrap();
   let dir = dir.into_path();
@@ -104,7 +106,7 @@ fn run_ok_cpp(file: &str) {
   info!("Start running {} at {}", file, dir.to_string_lossy());
   let executable = compile_cpp(&dir, &file);
   info!("Compile {} -> {} ok", &file, &executable);
-  let result = run_aplusb(&dir, &executable, true);
+  let result = run_aplusb(&dir, &executable, true, time, memory);
   assert!(result.is_none());
   info!("Running {} ok at {}", &file, dir.to_string_lossy());
   remove_dir_all(dir).unwrap();
@@ -113,40 +115,67 @@ fn run_ok_cpp(file: &str) {
 #[test]
 fn it_should_run_cpp_ac() {
   common::setup();
-  run_ok_cpp("ac.cpp");
+  run_ok_cpp("ac.cpp", 1000, 262144);
 }
 
 #[test]
 fn it_should_run_small_stack() {
   common::setup();
-  run_ok_cpp("small_stack.cpp");
+  run_ok_cpp("small_stack.cpp", 1000, 262144);
 }
 
 #[test]
 fn it_should_not_run_tle() {
   common::setup();
-  let result = run_fail_cpp("tle.cpp");
+  let result = run_fail_cpp("tle.cpp", 1000, 262144);
+  assert_eq!(*result.status(), None);
   assert!(result.time() > 1000);
 }
 
 #[test]
 fn it_should_not_run_mle() {
   common::setup();
-  let result = run_fail_cpp("mle.cpp");
+  let result = run_fail_cpp("mle.cpp", 1000, 262144);
+  assert_eq!(*result.status(), None);
+  assert!(result.memory() > 262144);
+}
+
+#[test]
+fn it_should_not_run_big_stack() {
+  common::setup();
+  let result = run_fail_cpp("big_stack.cpp", 1000, 262144);
+  assert_eq!(*result.status(), None);
   assert!(result.memory() > 262144);
 }
 
 #[test]
 fn it_should_not_run_fork() {
   common::setup();
-  let result = run_fail_cpp("fork.cpp");
+  let result = run_fail_cpp("fork.cpp", 1000, 262144);
   assert_eq!(*result.status(), None);
   assert_eq!(*result.signal(), Some(Signal::SIGKILL));
 }
 
 #[test]
-fn it_should_not_run_big_stack() {
+fn it_should_not_run_sleep() {
   common::setup();
-  let result = run_fail_cpp("big_stack.cpp");
-  assert!(result.memory() > 262144);
+  let result = run_fail_cpp("sleep.c", 1000, 262144);
+  assert_eq!(*result.status(), None);
+  assert_eq!(*result.signal(), Some(Signal::SIGALRM));
+}
+
+#[test]
+fn it_should_not_run_while1() {
+  common::setup();
+  let result = run_fail_cpp("while1.c", 1000, 262144);
+  assert_eq!(*result.status(), None);
+  assert_eq!(*result.signal(), Some(Signal::SIGALRM));
+}
+
+#[test]
+fn it_should_not_run_output_size() {
+  common::setup();
+  let result = run_fail_cpp("output_size.c", 5000, 262144);
+  assert_eq!(*result.status(), None);
+  assert_eq!(*result.signal(), Some(Signal::SIGXFSZ));
 }
