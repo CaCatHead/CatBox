@@ -23,6 +23,5 @@ jobs:
 
       - name: Test
         run: |
-          sudo ./init.sh $USER
           export RUST_BACKTRACE=full RUST_TEST_TASK=1
-          cargo test
+          sudo -E /home/${USER}/.cargo/bin/cargo test
