@@ -1,6 +1,6 @@
 # CatJ
 
-[![CI](https://github.com/yjl9903/CatBox/actions/workflows/ci.yml/badge.svg)](https://github.com/yjl9903/CatBox/actions/workflows/ci.yml) [![](https://img.shields.io/crates/v/catj)](https://crates.io/crates/catj)
+[![CI](https://github.com/CaCatHead/CatBox/actions/workflows/ci.yml/badge.svg)](https://github.com/CaCatHead/CatBox/actions/workflows/ci.yml) [![](https://img.shields.io/crates/v/catj)](https://crates.io/crates/catj)
 
 A light process isolation sandbox used for Competitive Programming contest.
 
@@ -23,7 +23,7 @@ A light process isolation sandbox used for Competitive Programming contest.
 $ cargo install catj
 
 # Or you can download binary with installation script
-$ curl -fsSL https://bina.egoist.sh/yjl9903/CatBox | sh
+$ curl -fsSL https://bina.egoist.sh/CaCatHead/CatBox | sh
 
 # Check installation
 $ catj --version

@@ -6,8 +6,8 @@ edition = "2021"
 
 description = "A light process isolation sandbox used for competitive programming contest"
 readme = "README.md"
-homepage = "https://github.com/yjl9903/CatBox"
-repository = "https://github.com/yjl9903/CatBox"
+homepage = "https://github.com/CaCatHead/CatBox"
+repository = "https://github.com/CaCatHead/CatBox"
 license = "MIT"
 keywords = ["sandbox", "cli"]
 categories = ["command-line-utilities"]

@@ -10,6 +10,10 @@ use tempfile::tempdir;
 
 use crate::syscall::SyscallFilter;
 
+pub struct CatBoxContextBuilder {}
+
+pub struct CatBoxContext {}
+
 /// CatBox running params that can config its behavior
 #[derive(Debug, Clone)]
 pub struct CatBoxParams {
