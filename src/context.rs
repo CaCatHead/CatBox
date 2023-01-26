@@ -123,6 +123,21 @@ impl CatBox {
     }
   }
 
+  /// Add result
+  pub fn add_result(&self) {
+
+  }
+
+  /// Report usage
+  pub fn report(&self) {
+    self.context.report();
+  }
+
+  /// Report json format usage
+  pub fn report_json(&self) {
+    self.context.report_json();
+  }
+
   /// Close all the CatBoxes
   pub fn close(self) {
     for option in self.options.into_iter() {
@@ -620,7 +635,7 @@ impl CatBoxOption {
 }
 
 impl CatBoxResult {
-  pub fn new(status: Option<i32>, signal: Option<Signal>, usage: CatBoxUsage) -> Self {
+  pub(crate) fn new(status: Option<i32>, signal: Option<Signal>, usage: CatBoxUsage) -> Self {
     CatBoxResult {
       status,
       signal,
