@@ -12,6 +12,7 @@ use crate::utils::mount::MountPoint;
 use crate::utils::{MemoryLimitType, TimeLimitType};
 
 pub use builder::{CatBoxBuilder, CatBoxOptionBuilder};
+use crate::CatBoxError;
 
 mod builder;
 
@@ -23,7 +24,7 @@ pub struct CatBox {
 
 /// CatBoxContext for storing running result
 pub trait CatBoxContext {
-  fn add_result(&mut self, option: &CatBoxOption, result: CatBoxResult);
+  fn add_result(&mut self, label: &String, result: CatBoxResult);
 
   fn report(&self) {
     let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
@@ -92,6 +93,14 @@ pub struct CatBoxResult {
 }
 
 impl CatBox {
+  pub fn start(&mut self) -> Result<(), CatBoxError> {
+    for option in self.options.iter() {
+      let result = crate::run(&option)?;
+      self.context.add_result(&option.label.clone(), result);
+    }
+    Ok(())
+  }
+
   /// List all the commands
   pub fn commands(&self) -> Iter<CatBoxOption> {
     self.options.iter()
@@ -104,11 +113,6 @@ impl CatBox {
     } else {
       None
     }
-  }
-
-  /// Add result
-  pub fn add_result(&mut self, option: &CatBoxOption, result: CatBoxResult) {
-    self.context.add_result(option, result);
   }
 
   /// Report usage
@@ -179,7 +183,7 @@ impl CatBoxRunContext {
 }
 
 impl CatBoxContext for CatBoxRunContext {
-  fn add_result(&mut self, _option: &CatBoxOption, result: CatBoxResult) {
+  fn add_result(&mut self, _label: &String, result: CatBoxResult) {
     self.max_time = max(self.max_time, result.time);
     self.max_memory = max(self.max_memory, result.memory);
     self.sum_time += result.time;
@@ -238,7 +242,7 @@ impl CatBoxContext for CatBoxRunContext {
 }
 
 impl CatBoxContext for CatBoxCompileContext {
-  fn add_result(&mut self, option: &CatBoxOption, result: CatBoxResult) {
+  fn add_result(&mut self, _label: &String, result: CatBoxResult) {
     todo!()
   }
 
@@ -252,7 +256,7 @@ impl CatBoxContext for CatBoxCompileContext {
 }
 
 impl CatBoxContext for CatBoxJudgeContext {
-  fn add_result(&mut self, option: &CatBoxOption, result: CatBoxResult) {
+  fn add_result(&mut self, _label: &String, result: CatBoxResult) {
     todo!()
   }
 

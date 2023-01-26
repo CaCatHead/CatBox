@@ -4,11 +4,8 @@ use std::env;
 use std::path::PathBuf;
 
 use clap::{command, Parser, Subcommand};
-use context::CatBoxResult;
 use flexi_logger::{FileSpec, Logger};
 use log::{error, info};
-use nix::libc::STDOUT_FILENO;
-use nix::unistd::isatty;
 
 use crate::catbox::run;
 use crate::context::{CatBox, CatBoxBuilder, CatBoxOption};
@@ -188,18 +185,6 @@ impl Cli {
   }
 }
 
-fn start(catbox: &mut CatBox) -> Result<(), CatBoxError> {
-  let commands = catbox
-    .commands()
-    .map(|c| c.clone())
-    .collect::<Vec<CatBoxOption>>();
-  for option in commands {
-    let result = run(&option)?;
-    catbox.add_result(&option, result);
-  }
-  Ok(())
-}
-
 fn bootstrap() -> Result<(), CatBoxError> {
   Logger::try_with_str("catj=info")?
     .log_to_file(
@@ -224,7 +209,7 @@ fn bootstrap() -> Result<(), CatBoxError> {
   let json_format = cli.json;
   let mut catbox = cli.resolve()?;
 
-  let result = match start(&mut catbox) {
+  let result = match catbox.start() {
     Ok(results) => {
       info!("Running catj finished");
       if report {
