@@ -10,9 +10,9 @@ use crate::cgroup::CatBoxUsage;
 use crate::syscall::SyscallFilter;
 use crate::utils::mount::MountPoint;
 use crate::utils::{MemoryLimitType, TimeLimitType};
+use crate::CatBoxError;
 
 pub use builder::{CatBoxBuilder, CatBoxOptionBuilder};
-use crate::CatBoxError;
 
 mod builder;
 
