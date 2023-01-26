@@ -1,5 +1,6 @@
 use flexi_logger::DeferredNow;
 use log::{error, info, Record};
+use nix::libc::{gid_t, uid_t};
 use std::env;
 use std::ffi::CString;
 
@@ -8,6 +9,14 @@ pub use pipe::{CatBoxPipe, CatBoxReadPipe, CatBoxWritePipe};
 
 pub mod mount;
 pub mod pipe;
+
+pub type TimeLimitType = u64;
+
+pub type MemoryLimitType = u64;
+
+pub type UidType = uid_t;
+
+pub type GidType = gid_t;
 
 /// A logline-formatter that produces log lines like <br>
 /// ```[datetime: INFO] Task successfully read from conf.json```

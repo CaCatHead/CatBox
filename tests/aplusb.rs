@@ -1,4 +1,4 @@
-use catj::{run, CatBoxBuilder, CatBoxOption, CatBoxResult};
+use catj::{run, CatBoxBuilder, CatBoxResult};
 use log::info;
 use nix::sys::signal::Signal;
 use std::env::current_dir;

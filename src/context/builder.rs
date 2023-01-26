@@ -1,30 +1,16 @@
-use std::env;
-use std::ffi::CString;
-use std::fs::remove_dir_all;
-use std::path::{Path, PathBuf};
-use std::slice::Iter;
-
-use log::{debug, error, info};
-use nix::libc;
-use nix::libc::{gid_t, rlim_t, uid_t, STDOUT_FILENO};
-use nix::mount::{umount2, MntFlags};
-use nix::sys::signal::Signal;
-use nix::unistd::{isatty, Gid, Group, Uid, User};
-use tempfile::tempdir;
-
+use crate::context::{CatBoxCompileContext, CatBoxContext, CatBoxJudgeContext, CatBoxRunContext};
 use crate::syscall::SyscallFilter;
 use crate::utils::mount::MountPoint;
-use crate::utils::{into_c_string, parse_env};
-use crate::CatBoxError;
-use crate::cgroup::CatBoxUsage;
-
-pub type TimeLimitType = u64;
-
-pub type MemoryLimitType = u64;
-
-pub type UidType = uid_t;
-
-pub type GidType = gid_t;
+use crate::utils::{into_c_string, parse_env, GidType, MemoryLimitType, TimeLimitType, UidType};
+use crate::{CatBox, CatBoxError, CatBoxOption};
+use log::{debug, error};
+use nix::libc;
+use nix::mount::{umount2, MntFlags};
+use nix::unistd::{Gid, Group, Uid, User};
+use std::env;
+use std::ffi::CString;
+use std::path::{Path, PathBuf};
+use tempfile::tempdir;
 
 /// Build CatBox
 pub struct CatBoxBuilder {
@@ -38,112 +24,10 @@ pub struct CatBoxBuilder {
   gid: Option<GidType>,
 }
 
-/// CatBox top structure for context and multiple commands
-pub struct CatBox {
-  context: Box<dyn CatBoxContext>,
-  options: Vec<CatBoxOption>,
-}
-
-/// CatBoxContext for storing running result
-pub trait CatBoxContext {
-  fn report(&self) {
-    let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
-    if is_tty {
-      self.report_human();
-    } else {
-      self.report_json();
-    }
-  }
-
-  fn report_human(&self);
-
-  fn report_json(&self);
-}
-
-pub struct CatBoxRunContext {}
-
-pub struct CatBoxCompileContext {}
-
-pub struct CatBoxJudgeContext {}
-
 /// Build CatBox running option
 pub struct CatBoxOptionBuilder {
   parent: CatBoxBuilder,
   option: CatBoxOption,
-}
-
-/// CatBox running params that can config its behavior
-#[derive(Debug, Clone)]
-pub struct CatBoxOption {
-  time_limit: TimeLimitType,
-  memory_limit: MemoryLimitType,
-  program: String,
-  arguments: Vec<String>,
-  uid: Uid,
-  gid: Gid,
-  cgroup: String,
-  process: u64,
-  ptrace: Option<SyscallFilter>,
-  stack_size: u64,
-  chroot: Option<PathBuf>,
-  cwd: PathBuf,
-  mounts: Vec<MountPoint>,
-  env: Vec<(String, String)>,
-  stdin: Option<String>,
-  stdout: Option<String>,
-  stderr: Option<String>,
-  force: bool,
-  debug: bool,
-}
-
-/// CatBox running result
-#[allow(unused)]
-#[derive(Debug, Clone)]
-pub struct CatBoxResult {
-  status: Option<i32>,
-  signal: Option<Signal>,
-  time: TimeLimitType,
-  time_user: TimeLimitType,
-  time_sys: TimeLimitType,
-  memory: MemoryLimitType,
-}
-
-impl CatBox {
-  /// List all the commands
-  pub fn commands(&self) -> Iter<CatBoxOption> {
-    self.options.iter()
-  }
-
-  /// Return the only command when there is just one command
-  pub fn single(&self) -> Option<&CatBoxOption> {
-    if self.options.len() == 1 {
-      self.options.first()
-    } else {
-      None
-    }
-  }
-
-  /// Add result
-  pub fn add_result(&self) {
-
-  }
-
-  /// Report usage
-  pub fn report(&self) {
-    self.context.report();
-  }
-
-  /// Report json format usage
-  pub fn report_json(&self) {
-    self.context.report_json();
-  }
-
-  /// Close all the CatBoxes
-  pub fn close(self) {
-    for option in self.options.into_iter() {
-      option.close();
-    }
-  }
 }
 
 impl CatBoxBuilder {
@@ -163,12 +47,17 @@ impl CatBoxBuilder {
 
   /// Create a run CatBox
   pub fn run() -> Self {
-    Self::new(Box::new(CatBoxRunContext {}))
+    Self::new(Box::new(CatBoxRunContext::new()))
   }
 
   /// Create a compile CatBox
   pub fn compile() -> Self {
     Self::new(Box::new(CatBoxCompileContext {}))
+  }
+
+  /// Create a judge CatBox
+  pub fn judge() -> Self {
+    Self::new(Box::new(CatBoxJudgeContext {}))
   }
 
   /// Create a new command to be run
@@ -182,6 +71,8 @@ impl CatBoxBuilder {
       arguments.into_iter().map(|a| a.into()).collect(),
     );
 
+    // Set default label
+    option.label = format!("catbox{}", self.options.len() + 1);
     // Set default time limit
     if let Some(time_limit) = self.time_limit {
       option.time_limit = time_limit;
@@ -214,7 +105,7 @@ impl CatBoxBuilder {
   }
 
   /// Build CatBox after setting all the options
-  pub fn build(mut self) -> CatBox {
+  pub fn build(self) -> CatBox {
     CatBox {
       context: self.context,
       options: self.options,
@@ -270,38 +161,24 @@ impl CatBoxBuilder {
   }
 }
 
-impl CatBoxContext for CatBoxRunContext {
-  fn report_human(&self) {
-    todo!()
-  }
-
-  fn report_json(&self) {
-    todo!()
-  }
-}
-
-impl CatBoxContext for CatBoxCompileContext {
-  fn report_human(&self) {
-    todo!()
-  }
-
-  fn report_json(&self) {
-    todo!()
-  }
-}
-
 impl CatBoxOptionBuilder {
   /// Finish building, return CatBoxBuilder
-  pub fn done(mut self) -> CatBoxBuilder {
+  pub fn done(self) -> CatBoxBuilder {
     let mut builder = self.parent;
     builder.options.push(self.option);
     builder
   }
 
   /// Finish building, return CatBox
-  pub fn build(mut self) -> CatBox {
+  pub fn build(self) -> CatBox {
     let builder = self.done();
     builder.build()
+  }
+
+  /// Set label
+  pub fn label(mut self, label: String) -> Self {
+    self.option.label = label;
+    self
   }
 
   /// Set time limit (unit: ms)
@@ -472,6 +349,7 @@ impl CatBoxOption {
     let catbox_group = Group::from_name("nogroup").unwrap().unwrap();
 
     CatBoxOption {
+      label: "catbox".to_string(),
       time_limit: 1000,
       memory_limit: 262144,
       program: program.into(),
@@ -495,6 +373,10 @@ impl CatBoxOption {
       force: false,
       debug: false,
     }
+  }
+
+  pub fn label(&self) -> &String {
+    &self.label
   }
 
   pub fn time_limit(&self) -> TimeLimitType {
@@ -533,7 +415,7 @@ impl CatBoxOption {
     &self.ptrace
   }
 
-  pub fn stack_size(&self) -> rlim_t {
+  pub fn stack_size(&self) -> libc::rlim_t {
     if self.stack_size == u64::MAX {
       libc::RLIM_INFINITY
     } else {
@@ -631,42 +513,5 @@ impl CatBoxOption {
         }
       }
     }
-  }
-}
-
-impl CatBoxResult {
-  pub(crate) fn new(status: Option<i32>, signal: Option<Signal>, usage: CatBoxUsage) -> Self {
-    CatBoxResult {
-      status,
-      signal,
-      time: usage.time(),
-      time_user: usage.time_user(),
-      time_sys: usage.time_sys(),
-      memory: usage.memory(),
-    }
-  }
-
-  pub fn status(&self) -> &Option<i32> {
-    &self.status
-  }
-
-  pub fn signal(&self) -> &Option<Signal> {
-    &self.signal
-  }
-
-  pub fn time(&self) -> TimeLimitType {
-    self.time
-  }
-
-  pub fn time_user(&self) -> TimeLimitType {
-    self.time_user
-  }
-
-  pub fn time_sys(&self) -> TimeLimitType {
-    self.time_sys
-  }
-
-  pub fn memory(&self) -> MemoryLimitType {
-    self.memory
   }
 }

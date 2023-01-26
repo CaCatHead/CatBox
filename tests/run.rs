@@ -1,6 +1,6 @@
 use std::fs;
 
-use catj::{run, CatBoxBuilder, CatBoxOption};
+use catj::{run, CatBoxBuilder};
 
 mod common;
 

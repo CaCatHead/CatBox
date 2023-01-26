@@ -11,10 +11,10 @@ use nix::libc::STDOUT_FILENO;
 use nix::unistd::isatty;
 
 use crate::catbox::run;
-use crate::context::{CatBox, CatBoxBuilder, CatBoxOption, MemoryLimitType, TimeLimitType};
+use crate::context::{CatBox, CatBoxBuilder, CatBoxOption};
 use crate::error::{CatBoxError, CatBoxExit};
-use crate::preset::make_compile_params;
-use crate::utils::default_format;
+// use crate::preset::make_compile_params;
+use crate::utils::{default_format, MemoryLimitType, TimeLimitType};
 
 mod catbox;
 mod cgroup;
@@ -126,7 +126,7 @@ enum Commands {
 
 impl Cli {
   fn resolve(self) -> Result<CatBox, CatBoxError> {
-    let mut builder = match self.command {
+    let builder = match self.command {
       Commands::Run { .. } => CatBoxBuilder::run(),
       Commands::Compile { .. } => CatBoxBuilder::compile(),
       Commands::Validate { .. } => {
@@ -144,7 +144,7 @@ impl Cli {
     .set_default_gid(self.gid)
     .parse_env_list(self.env)?;
 
-    let mut catbox = match self.command {
+    let catbox = match self.command {
       Commands::Run {
         program,
         arguments,
@@ -188,13 +188,16 @@ impl Cli {
   }
 }
 
-fn start(catbox: &CatBox) -> Result<Vec<CatBoxResult>, CatBoxError> {
-  let mut results = vec![];
-  for param in catbox.commands() {
-    let result = run(&param)?;
-    results.push(result);
+fn start(catbox: &mut CatBox) -> Result<(), CatBoxError> {
+  let commands = catbox
+    .commands()
+    .map(|c| c.clone())
+    .collect::<Vec<CatBoxOption>>();
+  for option in commands {
+    let result = run(&option)?;
+    catbox.add_result(&option, result);
   }
-  Ok(results)
+  Ok(())
 }
 
 fn bootstrap() -> Result<(), CatBoxError> {
@@ -219,65 +222,22 @@ fn bootstrap() -> Result<(), CatBoxError> {
   let cli = Cli::parse();
   let report = cli.report;
   let json_format = cli.json;
-  let catbox = cli.resolve()?;
+  let mut catbox = cli.resolve()?;
 
-  let result = match start(&catbox) {
+  let result = match start(&mut catbox) {
     Ok(results) => {
       info!("Running catj finished");
       if report {
-        if results.len() == 1 {
-          let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
-
-          let option = catbox.single().unwrap();
-          let result = results.first().unwrap();
-
-          if json_format || !is_tty {
-            let status = result
-              .status()
-              .map_or_else(|| "null".to_string(), |v| v.to_string());
-            let signal = result
-              .signal()
-              .map_or_else(|| "null".to_string(), |v| format!("\"{}\"", v));
-
-            println!("{{");
-            println!("  \"ok\": true,");
-            println!("  \"status\": {},", status);
-            println!("  \"signal\": {},", signal);
-            println!("  \"time\": {},", result.time());
-            println!("  \"time_user\": {},", result.time_user());
-            println!("  \"time_sys\": {},", result.time_sys());
-            println!("  \"memory\": {}", result.memory());
-            println!("}}");
-          } else {
-            let status = result.status().map_or_else(
-              || "\x1b[91m×\x1b[39m".to_string(),
-              |v| format!("\x1b[9{}m{}\x1b[39m", if v == 0 { 2 } else { 1 }, v),
-            );
-            let signal = result.signal().map_or_else(
-              || "\x1b[92m✓\x1b[39m".to_string(),
-              |v| format!("\x1b[91m{}\x1b[39m", v),
-            );
-
-            // 没有重定向输入输出，添加一个空行
-            if option.stdout().is_none() && option.stderr().is_none() {
-              println!("");
-            }
-            println!("\x1b[1mStatus\x1b[22m     {}", status);
-            println!("\x1b[1mSignal\x1b[22m     {}", signal);
-            println!("\x1b[1mTime\x1b[22m       {} ms", result.time());
-            println!("\x1b[1mTime user\x1b[22m  {} ms", result.time_user());
-            println!("\x1b[1mTime sys\x1b[22m   {} ms", result.time_sys());
-            println!("\x1b[1mMemory\x1b[22m     {} KB", result.memory());
-            println!();
-          }
+        if !json_format {
+          catbox.report();
+        } else {
+          catbox.report_json();
         }
       }
-
       Ok(())
     }
     Err(err) => {
       error!("Running catj failed: {}", err);
-
       Err(err)
     }
   };
