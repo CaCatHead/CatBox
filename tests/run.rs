@@ -1,18 +1,27 @@
 use std::fs;
 
-use catj::{run, CatBoxParams};
+use catj::{run, CatBoxBuilder, CatBoxOption};
 
 mod common;
 
 #[test]
+fn it_should_build_cat_box() {
+  CatBoxBuilder::run()
+    .command("g++", vec!["a.cpp", "-o", "a.out"])
+    .build();
+}
+
+#[test]
 fn it_should_echo() {
   common::setup();
-  let text = String::from("123");
+  let text = "123";
   let output_path = "./echo.out";
 
-  let mut params = CatBoxParams::new("echo", vec![text.clone()]);
-  params.stdout(Some(output_path));
-  run(&params).unwrap();
+  let catbox = CatBoxBuilder::run()
+    .command("echo", vec![text])
+    .stdout(output_path)
+    .build();
+  run(catbox.single().unwrap()).unwrap();
 
   let output = fs::read_to_string(output_path).unwrap();
   assert_eq!(output.trim(), text)

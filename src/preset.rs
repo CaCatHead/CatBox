@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::error::CatBoxError;
 use lazy_static::lazy_static;
 
-use super::context::CatBoxParams;
+use super::context::CatBoxOption;
 
 lazy_static! {
   static ref DETECT_LANGUAGE_MAP: HashMap<&'static str, &'static str> = {
@@ -43,25 +43,26 @@ pub fn make_compile_params(
   language: Option<String>,
   submission: String,
   _output: String,
-) -> Result<CatBoxParams, CatBoxError> {
+) -> Result<CatBoxOption, CatBoxError> {
   let language = detect_language(&language, &submission)
     .ok_or(CatBoxError::cli("Can not detect submission language"))?;
 
-  match language.as_str() {
-    "c" => {
-      let args = vec![];
-      let params = CatBoxParams::new("g++", args);
-      Ok(params)
-    }
-    "cpp" => {
-      let args = vec![];
-      let params = CatBoxParams::new("g++", args);
-      Ok(params)
-    }
-    _ => {
-      unimplemented!()
-    }
-  }
+  unimplemented!()
+  // match language.as_str() {
+  //   "c" => {
+  //     let args = vec![];
+  //     let params = CatBoxOption::new("g++", args);
+  //     Ok(params)
+  //   }
+  //   "cpp" => {
+  //     let args = vec![];
+  //     let params = CatBoxOption::new("g++", args);
+  //     Ok(params)
+  //   }
+  //   _ => {
+  //     unimplemented!()
+  //   }
+  // }
 }
 
 struct CompileOption {
@@ -96,17 +97,18 @@ impl CompileOption {
     self
   }
 
-  fn resolve(self: Self) -> Vec<CatBoxParams> {
-    let mut commands = vec![];
-    for command in self.commands {
-      let mut params = CatBoxParams::new(command.program, command.argument);
-      params
-        .time_limit(self.time_limit)
-        .memory_limit(self.memory_limit)
-        .process(self.process);
-      commands.push(params);
-    }
-    commands
+  fn resolve(self: Self) -> Vec<CatBoxOption> {
+    unimplemented!()
+    // let mut commands = vec![];
+    // for command in self.commands {
+    //   let mut params = CatBoxOption::new(command.program, command.argument);
+    //   params
+    //     .time_limit(self.time_limit)
+    //     .memory_limit(self.memory_limit)
+    //     .process(self.process);
+    //   commands.push(params);
+    // }
+    // commands
   }
 }
 

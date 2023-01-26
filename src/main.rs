@@ -11,7 +11,7 @@ use nix::libc::STDOUT_FILENO;
 use nix::unistd::isatty;
 
 use crate::catbox::run;
-use crate::context::CatBoxParams;
+use crate::context::{CatBox, CatBoxBuilder, CatBoxOption, MemoryLimitType, TimeLimitType};
 use crate::error::{CatBoxError, CatBoxExit};
 use crate::preset::make_compile_params;
 use crate::utils::default_format;
@@ -20,7 +20,6 @@ mod catbox;
 mod cgroup;
 mod context;
 mod error;
-mod pipe;
 mod preset;
 mod syscall;
 mod utils;
@@ -35,10 +34,10 @@ struct Cli {
   json: bool,
 
   #[arg(short, long, help = "Time limit (unit: ms)")]
-  time: Option<u64>,
+  time: Option<TimeLimitType>,
 
   #[arg(short, long, help = "Memory limit (unit: KB)")]
-  memory: Option<u64>,
+  memory: Option<MemoryLimitType>,
 
   #[arg(long, value_name = "KEY=VALUE", help = "Pass environment variables")]
   env: Vec<String>,
@@ -53,7 +52,7 @@ struct Cli {
   user: bool,
 
   #[arg(short, long, help = "Force security control")]
-  force: bool,
+  force: Option<bool>,
 
   #[structopt(subcommand)]
   command: Commands,
@@ -126,14 +125,26 @@ enum Commands {
 }
 
 impl Cli {
-  fn resolve(self) -> Result<Vec<CatBoxParams>, CatBoxError> {
-    let mut command = match self.command {
-      Commands::Compile {
-        language,
-        submission,
-        output,
-        ..
-      } => make_compile_params(language, submission, output)?,
+  fn resolve(self) -> Result<CatBox, CatBoxError> {
+    let mut builder = match self.command {
+      Commands::Run { .. } => CatBoxBuilder::run(),
+      Commands::Compile { .. } => CatBoxBuilder::compile(),
+      Commands::Validate { .. } => {
+        unimplemented!()
+      }
+      Commands::Check { .. } => {
+        unimplemented!()
+      }
+    }
+    .set_default_time_limit(self.time)
+    .set_default_memory_limit(self.memory)
+    .set_default_force(self.force)
+    .set_current_user(self.user)
+    .set_default_uid(self.uid)
+    .set_default_gid(self.gid)
+    .parse_env_list(self.env)?;
+
+    let mut catbox = match self.command {
       Commands::Run {
         program,
         arguments,
@@ -145,36 +156,25 @@ impl Cli {
         process,
         no_chroot,
         no_ptrace,
+      } => builder
+        .command(program, arguments)
+        .set_process(process)
+        .set_stdin(stdin)
+        .set_stdout(stdout)
+        .set_stderr(stderr)
+        .set_ptrace(!no_ptrace)
+        .set_chroot(!no_chroot)
+        .parse_mount_read(read)?
+        .parse_mount_write(write)?
+        .done(),
+      Commands::Compile {
+        language,
+        submission,
+        output,
+        ..
       } => {
-        let mut params = CatBoxParams::new(program, arguments);
-
-        for text in read {
-          if let Err(msg) = params.parse_mount_read(text) {
-            error!("Parse mount string fails");
-            return Err(CatBoxError::cli(msg));
-          }
-        }
-        for text in write {
-          if let Err(msg) = params.parse_mount_write(text) {
-            error!("Parse mount string fails");
-            return Err(CatBoxError::cli(msg));
-          }
-        }
-
-        params
-          .stdin(stdin)
-          .stdout(stdout)
-          .stderr(stderr)
-          .chroot(!no_chroot);
-
-        if no_ptrace {
-          params.ptrace(None);
-        }
-        if let Some(process) = process {
-          params.process(process);
-        }
-
-        params
+        // make_compile_params(language, submission, output)?
+        unimplemented!()
       }
       Commands::Validate { .. } => {
         unimplemented!()
@@ -184,41 +184,13 @@ impl Cli {
       }
     };
 
-    if let Some(time) = self.time {
-      command.time_limit(time);
-    }
-    if let Some(memory) = self.memory {
-      command.memory_limit(memory);
-    }
-
-    if self.force {
-      command.force();
-    }
-
-    if self.user {
-      command.current_user();
-    }
-    if let Some(uid) = self.uid {
-      command.uid(uid);
-    }
-    if let Some(gid) = self.gid {
-      command.gid(gid);
-    }
-
-    for env in self.env {
-      if let Err(msg) = command.parse_env(env) {
-        error!("Parse environment variable string fails");
-        return Err(CatBoxError::cli(msg));
-      }
-    }
-
-    Ok(vec![command])
+    Ok(catbox.build())
   }
 }
 
-fn start(params: &Vec<CatBoxParams>) -> Result<Vec<CatBoxResult>, CatBoxError> {
+fn start(catbox: &CatBox) -> Result<Vec<CatBoxResult>, CatBoxError> {
   let mut results = vec![];
-  for param in params {
+  for param in catbox.commands() {
     let result = run(&param)?;
     results.push(result);
   }
@@ -229,7 +201,7 @@ fn bootstrap() -> Result<(), CatBoxError> {
   Logger::try_with_str("catj=info")?
     .log_to_file(
       FileSpec::default()
-        .directory(env::var("LOG_DIR").unwrap_or("./logs/".into()))
+        .directory(env::var("CATJ_LOG").unwrap_or("./logs/".into()))
         .basename("catj")
         .discriminant(format!(
           "{}",
@@ -247,55 +219,55 @@ fn bootstrap() -> Result<(), CatBoxError> {
   let cli = Cli::parse();
   let report = cli.report;
   let json_format = cli.json;
-  let params = cli.resolve()?;
+  let catbox = cli.resolve()?;
 
-  let result = match start(&params) {
+  let result = match start(&catbox) {
     Ok(results) => {
       info!("Running catj finished");
       if report {
         if results.len() == 1 {
           let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
 
-          let param = params.get(0).unwrap();
+          let option = catbox.single().unwrap();
           let result = results.first().unwrap();
 
           if json_format || !is_tty {
             let status = result
-              .status
+              .status()
               .map_or_else(|| "null".to_string(), |v| v.to_string());
             let signal = result
-              .signal
+              .signal()
               .map_or_else(|| "null".to_string(), |v| format!("\"{}\"", v));
 
             println!("{{");
             println!("  \"ok\": true,");
             println!("  \"status\": {},", status);
             println!("  \"signal\": {},", signal);
-            println!("  \"time\": {},", result.time);
-            println!("  \"time_user\": {},", result.time_user);
-            println!("  \"time_sys\": {},", result.time_sys);
-            println!("  \"memory\": {}", result.memory);
+            println!("  \"time\": {},", result.time());
+            println!("  \"time_user\": {},", result.time_user());
+            println!("  \"time_sys\": {},", result.time_sys());
+            println!("  \"memory\": {}", result.memory());
             println!("}}");
           } else {
-            let status = result.status.map_or_else(
+            let status = result.status().map_or_else(
               || "\x1b[91m×\x1b[39m".to_string(),
               |v| format!("\x1b[9{}m{}\x1b[39m", if v == 0 { 2 } else { 1 }, v),
             );
-            let signal = result.signal.map_or_else(
+            let signal = result.signal().map_or_else(
               || "\x1b[92m✓\x1b[39m".to_string(),
               |v| format!("\x1b[91m{}\x1b[39m", v),
             );
 
             // 没有重定向输入输出，添加一个空行
-            if param.stdout.is_none() && param.stderr.is_none() {
+            if option.stdout().is_none() && option.stderr().is_none() {
               println!("");
             }
             println!("\x1b[1mStatus\x1b[22m     {}", status);
             println!("\x1b[1mSignal\x1b[22m     {}", signal);
-            println!("\x1b[1mTime\x1b[22m       {} ms", result.time);
-            println!("\x1b[1mTime user\x1b[22m  {} ms", result.time_user);
-            println!("\x1b[1mTime sys\x1b[22m   {} ms", result.time_sys);
-            println!("\x1b[1mMemory\x1b[22m     {} KB", result.memory);
+            println!("\x1b[1mTime\x1b[22m       {} ms", result.time());
+            println!("\x1b[1mTime user\x1b[22m  {} ms", result.time_user());
+            println!("\x1b[1mTime sys\x1b[22m   {} ms", result.time_sys());
+            println!("\x1b[1mMemory\x1b[22m     {} KB", result.memory());
             println!();
           }
         }
@@ -310,9 +282,7 @@ fn bootstrap() -> Result<(), CatBoxError> {
     }
   };
 
-  for param in params {
-    param.close();
-  }
+  catbox.close();
 
   result
 }

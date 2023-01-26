@@ -1,4 +1,4 @@
-use catj::{run, CatBoxParams, CatBoxResult};
+use catj::{run, CatBoxBuilder, CatBoxOption, CatBoxResult};
 use log::info;
 use nix::sys::signal::Signal;
 use std::env::current_dir;
@@ -28,20 +28,22 @@ fn compile_cpp(dir: &PathBuf, file: &String) -> String {
     String::from("-lm"),
   ];
 
-  let mut params = CatBoxParams::new(program.clone(), arguments);
-  params
+  let catbox = CatBoxBuilder::run()
+    .command(program, arguments)
     .time_limit(10 * 1000)
-    .stdin(Some("/dev/null"))
-    // .stdout(Some("/dev/null"))
-    // .stderr(Some("/dev/null"))
-    .chroot(true)
+    .stdin("/dev/null")
+    .stdout("/dev/null")
+    // .stderr("/dev/null")
     .current_user()
-    .ptrace(None)
+    .set_ptrace(false)
     .process(10)
+    .chroot()
     .cwd(current_dir().unwrap())
     .mount_read(&source_dir, &source_dir)
-    .mount_write(&dir, &dir);
-  run(&params).unwrap();
+    .mount_write(&dir, &dir)
+    .build();
+  run(catbox.single().unwrap()).unwrap();
+  catbox.close();
 
   executable.to_string()
 }
@@ -59,19 +61,19 @@ fn run_aplusb(
     let sub_out = dir.join("sub.out");
     let sub_out = sub_out.to_string_lossy().to_string();
 
-    let mut params = CatBoxParams::new(executable.clone(), vec![]);
-    params
-      // .debug()
+    let catbox = CatBoxBuilder::run()
+      .command::<String, String>(executable.clone(), vec![])
       .time_limit(time)
       .memory_limit(memory)
-      .stdin(Some(sub_in.clone()))
-      .stdout(Some(sub_out.clone()))
-      .stderr(Some("/dev/null"))
-      .chroot(true)
+      .stdin(sub_in.clone())
+      .stdout(sub_out.clone())
+      .stderr("/dev/null")
       .env("ONLINE_JUDGE", "true")
+      .chroot()
       .cwd("/")
-      .mount_read(&dir, &dir);
-    let result = run(&params).unwrap();
+      .mount_read(&dir, &dir)
+      .build();
+    let result = run(catbox.single().unwrap()).unwrap();
 
     let out = fs::read_to_string(sub_out.clone()).unwrap();
     let ans = fs::read_to_string(PathBuf::from(format!(
@@ -81,7 +83,7 @@ fn run_aplusb(
     .unwrap();
 
     remove_file(Path::new(sub_out.as_str())).unwrap();
-    params.close();
+    catbox.close();
 
     if ok {
       info!("Testcase #{}. out: {}", i, out.trim_end());

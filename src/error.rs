@@ -5,7 +5,7 @@ use std::{
 };
 
 use flexi_logger::FlexiLoggerError;
-use nix::{errno::Errno, libc::STDOUT_FILENO, unistd::isatty};
+use nix::{errno::Errno, libc::STDERR_FILENO, unistd::isatty};
 
 /// CatBox Error
 pub enum CatBoxError {
@@ -23,6 +23,8 @@ pub enum CatBoxError {
   Cli(String),
   /// Logger creation failed.
   Logger(FlexiLoggerError),
+  /// Unknown error
+  Unknown(String),
 }
 
 #[allow(unused)]
@@ -63,8 +65,9 @@ impl Display for CatBoxError {
       CatBoxError::Exec(msg) => f.write_fmt(format_args!("CatBox Exec Error: {}", msg)),
       CatBoxError::Nix(errno) => f.write_fmt(format_args!("CatBox Nix Error: {}", errno)),
       CatBoxError::Fs(msg) => f.write_fmt(format_args!("CatBox File System Error: {}", msg)),
-      CatBoxError::Cli(msg) => f.write_fmt(format_args!("CatBox CLI Error: {}", msg)),
-      CatBoxError::Logger(err) => f.write_fmt(format_args!("CatBox Logger Error: {}", err)),
+      CatBoxError::Cli(msg) => f.write_fmt(format_args!("CLI Error: {}", msg)),
+      CatBoxError::Logger(err) => f.write_fmt(format_args!("Logger Error: {}", err)),
+      CatBoxError::Unknown(msg) => f.write_fmt(format_args!("Unknown Error: {}", msg)),
     }
   }
 }
@@ -87,6 +90,12 @@ impl From<FlexiLoggerError> for CatBoxError {
   }
 }
 
+impl From<String> for CatBoxError {
+  fn from(msg: String) -> Self {
+    CatBoxError::Unknown(msg)
+  }
+}
+
 impl Error for CatBoxError {}
 
 impl Termination for CatBoxExit {
@@ -97,7 +106,7 @@ impl Termination for CatBoxExit {
         let text = format!("{}", err);
         let text = match text.split_once(": ") {
           Some((prefix, message)) => {
-            let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
+            let is_tty = isatty(STDERR_FILENO).unwrap_or(false);
             if is_tty {
               format!("\x1b[1m\x1b[91m{}\x1b[39m\x1b[22m  {}", prefix, message)
             } else {

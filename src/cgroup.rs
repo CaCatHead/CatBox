@@ -12,7 +12,7 @@ use nix::sys::time::TimeVal;
 use nix::unistd::Pid;
 
 use crate::error::CatBoxError;
-use crate::CatBoxParams;
+use crate::CatBoxOption;
 
 pub struct CatBoxCgroup {
   name: String,
@@ -30,7 +30,7 @@ pub struct CatBoxUsage {
 }
 
 impl CatBoxCgroup {
-  pub fn new(params: &CatBoxParams, child: Pid) -> Result<Self, CatBoxError> {
+  pub fn new(option: &CatBoxOption, child: Pid) -> Result<Self, CatBoxError> {
     let hierarchy = cgroups_rs::hierarchies::auto();
 
     let mut enable_cpuacct = hierarchy
@@ -51,13 +51,13 @@ impl CatBoxCgroup {
       .iter()
       .any(|subsystem| subsystem.controller_name() == "pids");
 
-    let cgroup_name = format!("{}/{}.{}", params.cgroup, params.cgroup, child.as_raw());
+    let cgroup_name = format!("{}/{}.{}", option.cgroup(), option.cgroup(), child.as_raw());
 
     debug!("Init cgroup {}", cgroup_name);
 
     let builder = CgroupBuilder::new(cgroup_name.as_str());
     let builder = if enable_memory {
-      let memory_limit = params.memory_limit as i64 * 1024 + 4 * 1024;
+      let memory_limit = option.memory_limit() as i64 * 1024 + 4 * 1024;
       builder
         .memory()
         .memory_soft_limit(memory_limit)
@@ -75,7 +75,7 @@ impl CatBoxCgroup {
     let builder = if enable_pids {
       builder
         .pid()
-        .maximum_number_of_processes(MaxValue::Value(params.process as i64))
+        .maximum_number_of_processes(MaxValue::Value(option.process() as i64))
         .done()
     } else {
       builder
@@ -100,7 +100,7 @@ impl CatBoxCgroup {
       Ok(cgroup) => cgroup,
       Err(err) => {
         error!("Build cgroup fails: {}", err);
-        if params.force {
+        if option.force() {
           return Err(CatBoxError::cgroup(err.to_string()));
         } else {
           return Ok(CatBoxCgroup {
@@ -161,28 +161,28 @@ impl CatBoxCgroup {
 
     // 默认回退到不使用 cgroup，force 模式下报错
     if !enable_cpuacct {
-      if params.force {
+      if option.force() {
         return Err(CatBoxError::cgroup("cgroup cpuacct is not supported"));
       } else {
         warn!("cgroup cpuacct is not supported");
       }
     }
     if !enable_memory {
-      if params.force {
+      if option.force() {
         return Err(CatBoxError::cgroup("cgroup memory is not supported"));
       } else {
         warn!("cgroup memory is not supported");
       }
     }
     if !enable_cpu {
-      if params.force {
+      if option.force() {
         return Err(CatBoxError::cgroup("cgroup cpu is not supported"));
       } else {
         warn!("cgroup cpu is not supported");
       }
     }
     if !enable_pids {
-      if params.force {
+      if option.force() {
         return Err(CatBoxError::cgroup("cgroup pids is not supported"));
       } else {
         warn!("cgroup pids is not supported");

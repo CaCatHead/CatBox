@@ -18,26 +18,25 @@ use nix::unistd::{alarm, chdir, chroot, execvpe, fork, setgid, setuid, ForkResul
 use crate::cgroup::CatBoxCgroup;
 use crate::context::CatBoxResult;
 use crate::error::CatBoxError;
-use crate::pipe::CatBoxPipe;
-use crate::utils::into_c_string;
-use crate::CatBoxParams;
+use crate::utils::{into_c_string, CatBoxPipe};
+use crate::CatBoxOption;
 
 /// 重定向输出输出
-fn redirect_io(params: &CatBoxParams) -> Result<(), CatBoxError> {
+fn redirect_io(option: &CatBoxOption) -> Result<(), CatBoxError> {
   unsafe {
-    if let Some(in_path) = &params.stdin {
+    if let Some(in_path) = option.stdin() {
       let in_path = into_c_string(&in_path);
       let mode = CString::new("r").unwrap();
       freopen(in_path.as_ptr(), mode.as_ptr(), stdin());
     }
 
-    if let Some(out_path) = &params.stdout {
+    if let Some(out_path) = option.stdout() {
       let out_path = into_c_string(&out_path);
       let mode = CString::new("w").unwrap();
       freopen(out_path.as_ptr(), mode.as_ptr(), stdout());
     }
 
-    if let Some(err_path) = &params.stderr {
+    if let Some(err_path) = option.stderr() {
       let err_path = into_c_string(&err_path);
       let mode = CString::new("w").unwrap();
       freopen(err_path.as_ptr(), mode.as_ptr(), stderr());
@@ -127,16 +126,16 @@ fn redirect_io(params: &CatBoxParams) -> Result<(), CatBoxError> {
 }
 
 /// 设置子进程时钟 signal，运行时限 + 1 秒
-fn set_alarm(params: &CatBoxParams) {
-  let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as c_uint;
+fn set_alarm(option: &CatBoxOption) {
+  let time_limit = (option.time_limit() as f64 / 1000.0 as f64).ceil() as c_uint;
   alarm::set(time_limit + 1);
   debug!("Set alarm {} seconds", time_limit + 1);
 }
 
 /// 调用 setrlimit
-fn set_resource_limit(params: &CatBoxParams) -> Result<(), CatBoxError> {
+fn set_resource_limit(option: &CatBoxOption) -> Result<(), CatBoxError> {
   // 运行时限
-  let time_limit = (params.time_limit as f64 / 1000.0 as f64).ceil() as u64;
+  let time_limit = (option.time_limit() as f64 / 1000.0 as f64).ceil() as u64;
   setrlimit(Resource::RLIMIT_CPU, time_limit + 1, time_limit + 1)?;
 
   // 地址空间无限
@@ -146,12 +145,8 @@ fn set_resource_limit(params: &CatBoxParams) -> Result<(), CatBoxError> {
     libc::RLIM_INFINITY,
   )?;
 
-  let stack_size = if params.stack_size == u64::MAX {
-    libc::RLIM_INFINITY
-  } else {
-    params.stack_size
-  };
-  debug!("Set stack size {} bytes", stack_size);
+  // 设置栈空间
+  let stack_size = option.stack_size();
   setrlimit(Resource::RLIMIT_STACK, stack_size, stack_size)?;
 
   // 输出大小 256 MB
@@ -162,7 +157,7 @@ fn set_resource_limit(params: &CatBoxParams) -> Result<(), CatBoxError> {
 }
 
 /// chroot
-fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), CatBoxError> {
+fn change_root(new_root: &PathBuf, option: &CatBoxOption) -> Result<(), CatBoxError> {
   info!("Mount new root: {}", new_root.to_string_lossy());
 
   mount::<PathBuf, PathBuf, PathBuf, PathBuf>(
@@ -181,7 +176,7 @@ fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), CatBoxEr
     None,
   )?;
 
-  for mount_point in &params.mounts {
+  for mount_point in option.mounts() {
     if !mount_point.dst().is_absolute() {
       error!(
         "The dst path {} in mounts should be absolute",
@@ -222,12 +217,12 @@ fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), CatBoxEr
 
   chroot(new_root)?;
 
-  let cwd = &params.cwd;
+  let cwd = option.cwd();
   if cwd.exists() {
     chdir(cwd.as_path())?;
   } else {
     error!(
-      "Chdir fails: path {} does not exisit when ",
+      "Chdir fails: path {} does not exist when ",
       cwd.to_string_lossy()
     );
     chdir(Path::new("/"))?;
@@ -238,9 +233,9 @@ fn change_root(new_root: &PathBuf, params: &CatBoxParams) -> Result<(), CatBoxEr
 
 /// 获取环境变量
 /// 默认只传递 PATH 环境变量
-fn get_env(params: &CatBoxParams) -> Vec<CString> {
+fn get_env(option: &CatBoxOption) -> Vec<CString> {
   let mut envs = vec![];
-  for (key, value) in params.env.iter() {
+  for (key, value) in option.env().iter() {
     let pair = format!("{}={}", key, value);
     envs.push(into_c_string(&pair));
   }
@@ -248,7 +243,7 @@ fn get_env(params: &CatBoxParams) -> Vec<CString> {
 }
 
 /// Run process isolation sandbox
-pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
+pub fn run(option: &CatBoxOption) -> Result<CatBoxResult, CatBoxError> {
   let pipe = CatBoxPipe::new()?;
 
   match unsafe { fork() } {
@@ -256,10 +251,10 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
       let pipe = pipe.read()?;
 
       // 设置 cgroup
-      let cgroup = CatBoxCgroup::new(&params, child)?;
+      let cgroup = CatBoxCgroup::new(&option, child)?;
 
       // 复制 SyscallFilter
-      let mut filter = params.ptrace.clone();
+      let mut filter = option.ptrace().clone();
       let mut last_signal: Option<Signal> = None;
 
       debug!("Start waiting for child process");
@@ -368,14 +363,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
       let usage = cgroup.usage();
       info!("{:?}", usage);
 
-      Ok(CatBoxResult {
-        status,
-        signal,
-        time: usage.time(),
-        time_user: usage.time_user(),
-        time_sys: usage.time_sys(),
-        memory: usage.memory(),
-      })
+      Ok(CatBoxResult::new(status, signal, usage))
     }
     Ok(ForkResult::Child) => {
       info!("Child process is running");
@@ -391,11 +379,11 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
       let pipe = pipe.write()?;
 
       // 重定向输入输出
-      redirect_io(&params)?;
+      redirect_io(&option)?;
 
       // chroot
-      if let Some(chroot) = &params.chroot {
-        match change_root(chroot, &params) {
+      if let Some(chroot) = option.chroot() {
+        match change_root(chroot, &option) {
           Ok(_) => {
             debug!("Chroot ok: {}", chroot.to_string_lossy());
           }
@@ -406,31 +394,27 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
       }
 
       // 设置时钟
-      set_alarm(&params);
+      set_alarm(&option);
 
       // setrlimit
-      set_resource_limit(&params)?;
+      set_resource_limit(&option)?;
 
       // 设置用户
-      if let Err(err) = setgid(params.gid) {
-        error!("Set gid {} fails: {}", params.gid, err);
+      if let Err(err) = setgid(option.gid()) {
+        error!("Set gid {} fails: {}", option.gid(), err);
       }
-      if let Err(err) = setuid(params.uid) {
-        error!("Set uid {} fails: {}", params.uid, err);
+      if let Err(err) = setuid(option.uid()) {
+        error!("Set uid {} fails: {}", option.uid(), err);
       }
 
       // execvpe 运行用户程序
-      let program = into_c_string(&params.program);
+      let program = option.program();
       let path = program.clone();
       let path = path.as_ref();
-      let args = params
-        .arguments
-        .iter()
-        .map(|p| into_c_string(p))
-        .collect::<Vec<CString>>();
+      let args = option.arguments();
       let args = [vec![program], args].concat();
       let args = args.as_slice();
-      let env = get_env(&params);
+      let env = get_env(&option);
 
       {
         let args = args
@@ -441,7 +425,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
       }
 
       // 启动 ptrace 追踪子进程
-      if params.ptrace.is_some() {
+      if option.ptrace().is_some() {
         ptrace::traceme().unwrap();
       }
 
@@ -450,7 +434,7 @@ pub fn run(params: &CatBoxParams) -> Result<CatBoxResult, CatBoxError> {
         pipe.write(format!("Execvpe fails: {} (Errno: {:?})", &e.desc(), &e))?;
 
         error!("Execvpe fails: {}", e.desc());
-        info!("Submission path: {}", params.program);
+        info!("Submission path: {}", option.program().to_string_lossy());
         let args = args
           .iter()
           .map(|cstr| cstr.to_string_lossy().into())
