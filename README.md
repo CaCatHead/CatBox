@@ -27,7 +27,7 @@ $ curl -fsSL https://bina.egoist.sh/CaCatHead/CatBox | sh
 
 # Check installation
 $ catj --version
-catj 0.1.3
+catj 0.1.4
 
 # Init cgroup for current user
 $ ./init.sh $USER

@@ -93,6 +93,7 @@ pub struct CatBoxResult {
 }
 
 impl CatBox {
+  /// Run all the commands
   pub fn start(&mut self) -> Result<(), CatBoxError> {
     for option in self.options.iter() {
       let result = crate::run(&option)?;
