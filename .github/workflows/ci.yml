@@ -24,4 +24,4 @@ jobs:
       - name: Test
         run: |
           export RUST_BACKTRACE=full RUST_TEST_TASK=1 RUST_TEST_TIME_UNIT=10000,10000
-          sudo -E /home/${USER}/.cargo/bin/cargo test
+          sudo -E /home/${USER}/.cargo/bin/cargo test --jobs=1 -- --test-threads=1
