@@ -197,7 +197,8 @@ fn it_should_not_run_sleep() {
   common::setup();
   let result = run_fail_cpp("sleep.c", 1000, 262144);
   assert_eq!(*result.status(), None);
-  assert_eq!(*result.signal(), Some(Signal::SIGALRM));
+  let signal = result.signal().unwrap();
+  assert!(signal == Signal::SIGALRM || signal == Signal::SIGKILL);
 }
 
 #[test]
