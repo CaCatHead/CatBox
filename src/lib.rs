@@ -36,6 +36,7 @@
 pub use catbox::run;
 pub use context::{CatBox, CatBoxBuilder, CatBoxOption, CatBoxOptionBuilder, CatBoxResult};
 pub use error::CatBoxError;
+pub use syscall::{RestrictedSyscall, SyscallFilter};
 
 mod catbox;
 mod cgroup;

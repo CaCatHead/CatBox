@@ -1,5 +1,5 @@
 use crate::context::{CatBoxCompileContext, CatBoxContext, CatBoxJudgeContext, CatBoxRunContext};
-use crate::syscall::SyscallFilter;
+use crate::syscall::{RestrictedSyscall, SyscallFilter};
 use crate::utils::mount::MountPoint;
 use crate::utils::{into_c_string, parse_env, GidType, MemoryLimitType, TimeLimitType, UidType};
 use crate::{CatBox, CatBoxError, CatBoxOption};
@@ -22,6 +22,7 @@ pub struct CatBoxBuilder {
   memory_limit: Option<MemoryLimitType>,
   uid: Option<UidType>,
   gid: Option<GidType>,
+  cwd: Option<PathBuf>,
 }
 
 /// Build CatBox running option
@@ -42,6 +43,7 @@ impl CatBoxBuilder {
       memory_limit: None,
       uid: None,
       gid: None,
+      cwd: None,
     }
   }
 
@@ -93,6 +95,10 @@ impl CatBoxBuilder {
     if let Some(gid) = self.gid {
       option.gid = Gid::from(gid);
     }
+    // Set default cwd
+    if let Some(cwd) = &self.cwd {
+      option.cwd = cwd.clone();
+    }
     // Set default env
     for env_pair in self.env.iter() {
       option.env.push(env_pair.clone());
@@ -125,8 +131,8 @@ impl CatBoxBuilder {
   }
 
   /// Set default force mode
-  pub fn set_default_force(mut self, flag: Option<bool>) -> Self {
-    self.force = flag;
+  pub fn set_default_force(mut self, flag: bool) -> Self {
+    self.force = Some(flag);
     self
   }
 
@@ -149,6 +155,12 @@ impl CatBoxBuilder {
       self.uid = Some(current_user.uid.as_raw());
       self.gid = Some(current_user.gid.as_raw());
     }
+    self
+  }
+
+  /// Set default cwd
+  pub fn set_default_cwd(mut self, path: Option<PathBuf>) -> Self {
+    self.cwd = path;
     self
   }
 
@@ -273,13 +285,29 @@ impl CatBoxOptionBuilder {
     }
   }
 
-  /// Set ptrace syscall filter
-  pub fn set_ptrace(mut self, flag: bool) -> Self {
-    if flag {
-      self.option.ptrace = Some(SyscallFilter::default());
-    } else {
-      self.option.ptrace = None;
+  /// Parse ptrace syscall filter
+  pub fn parse_ptrace_presets(mut self, presets: Option<Vec<String>>) -> Result<Self, CatBoxError> {
+    if let Some(presets) = presets {
+      self.option.ptrace = SyscallFilter::parse_presets(presets)?;
     }
+    Ok(self)
+  }
+
+  /// Set ptrace feature
+  pub fn ptrace(mut self, preset: RestrictedSyscall) -> Self {
+    let mut filter = self
+      .option
+      .ptrace
+      .get_or_insert(SyscallFilter::new())
+      .to_owned();
+    filter.enable(preset);
+    self.option.ptrace = Some(filter);
+    self
+  }
+
+  /// Disable ptrace
+  pub fn disable_ptrace(mut self) -> Self {
+    self.option.ptrace = None;
     self
   }
 
@@ -288,6 +316,14 @@ impl CatBoxOptionBuilder {
     let temp = tempdir().unwrap();
     let temp = temp.into_path();
     self.option.chroot = Some(temp);
+    self
+  }
+
+  /// Set work directory in chroot or not
+  pub fn set_cwd(mut self, path: Option<PathBuf>) -> Self {
+    if let Some(path) = path {
+      self.option.cwd = path;
+    }
     self
   }
 

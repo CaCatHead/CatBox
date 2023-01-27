@@ -11,7 +11,7 @@ use crate::catbox::run;
 use crate::context::{CatBox, CatBoxBuilder, CatBoxOption};
 use crate::error::{CatBoxError, CatBoxExit};
 // use crate::preset::make_compile_params;
-use crate::utils::{default_format, MemoryLimitType, TimeLimitType};
+use crate::utils::{default_format, GidType, MemoryLimitType, TimeLimitType, UidType};
 
 mod catbox;
 mod cgroup;
@@ -30,26 +30,29 @@ struct Cli {
   #[arg(long, requires = "report", help = "Output JSON format report")]
   json: bool,
 
-  #[arg(short, long, help = "Time limit (unit: ms)")]
+  #[arg(short, long, help = "Time limit (unit: ms) [default: 1000]")]
   time: Option<TimeLimitType>,
 
-  #[arg(short, long, help = "Memory limit (unit: KB)")]
+  #[arg(short, long, help = "Memory limit (unit: KB) [default: 262144]")]
   memory: Option<MemoryLimitType>,
 
   #[arg(long, value_name = "KEY=VALUE", help = "Pass environment variables")]
   env: Vec<String>,
 
+  #[arg(long, help = "Current working directory [default: ./]")]
+  cwd: Option<PathBuf>,
+
   #[arg(long, help = "Child process uid")]
-  uid: Option<u32>,
+  uid: Option<UidType>,
 
   #[arg(long, help = "Child process gid")]
-  gid: Option<u32>,
+  gid: Option<GidType>,
 
-  #[arg(long, help = "Run in current user")]
+  #[arg(long, help = "Run in current user [default: false]")]
   user: bool,
 
-  #[arg(short, long, help = "Force security control")]
-  force: Option<bool>,
+  #[arg(short, long, help = "Force security control [default: false]")]
+  force: bool,
 
   #[structopt(subcommand)]
   command: Commands,
@@ -83,11 +86,15 @@ enum Commands {
     #[arg(long, help = "The number of processes")]
     process: Option<u64>,
 
+    #[arg(
+      long,
+      value_name = "PRESET",
+      help = "Enable ptrace presets [support: none|net|process|all]"
+    )]
+    ptrace: Option<Vec<String>>,
+
     #[arg(long, help = "Disable chroot")]
     no_chroot: bool,
-
-    #[arg(long, help = "Disable ptrace")]
-    no_ptrace: bool,
   },
 
   #[command(about = "Compile user code")]
@@ -139,6 +146,7 @@ impl Cli {
     .set_current_user(self.user)
     .set_default_uid(self.uid)
     .set_default_gid(self.gid)
+    .set_default_cwd(self.cwd)
     .parse_env_list(self.env)?;
 
     let catbox = match self.command {
@@ -151,16 +159,16 @@ impl Cli {
         read,
         write,
         process,
+        ptrace,
         no_chroot,
-        no_ptrace,
       } => builder
         .command(program, arguments)
         .set_process(process)
         .set_stdin(stdin)
         .set_stdout(stdout)
         .set_stderr(stderr)
-        .set_ptrace(!no_ptrace)
         .set_chroot(!no_chroot)
+        .parse_ptrace_presets(ptrace)?
         .parse_mount_read(read)?
         .parse_mount_write(write)?
         .done(),

@@ -1,4 +1,4 @@
-use catj::{run, CatBoxBuilder, CatBoxResult};
+use catj::{run, CatBoxBuilder, CatBoxResult, RestrictedSyscall};
 use log::info;
 use nix::sys::signal::Signal;
 use std::env::current_dir;
@@ -35,7 +35,7 @@ fn compile_cpp(dir: &PathBuf, file: &String) -> String {
     .stdout("/dev/null")
     // .stderr("/dev/null")
     .current_user()
-    .set_ptrace(false)
+    .disable_ptrace()
     .process(10)
     .chroot()
     .cwd(current_dir().unwrap())
