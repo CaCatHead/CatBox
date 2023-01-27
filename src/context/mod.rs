@@ -1,3 +1,5 @@
+//! CatBox Context
+
 use std::cmp::max;
 use std::path::PathBuf;
 use std::slice::Iter;

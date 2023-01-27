@@ -40,7 +40,7 @@ pub use syscall::{RestrictedSyscall, SyscallFilter};
 
 mod catbox;
 mod cgroup;
-mod context;
+pub mod context;
 mod error;
 mod syscall;
 mod utils;
