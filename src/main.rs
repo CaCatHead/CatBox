@@ -36,16 +36,16 @@ struct Cli {
   #[arg(short, long, help = "Memory limit (unit: KB) [default: 262144]")]
   memory: Option<MemoryLimitType>,
 
-  #[arg(long, value_name = "KEY=VALUE", help = "Pass environment variables")]
+  #[arg(long, value_name = "KEY=VALUE", help = "Pass environment variables [default: PATH]")]
   env: Vec<String>,
 
   #[arg(long, help = "Current working directory [default: ./]")]
   cwd: Option<PathBuf>,
 
-  #[arg(long, help = "Child process uid")]
+  #[arg(long, help = "Child process uid [default: nobody]")]
   uid: Option<UidType>,
 
-  #[arg(long, help = "Child process gid")]
+  #[arg(long, help = "Child process gid [default: nogroup]")]
   gid: Option<GidType>,
 
   #[arg(long, help = "Run in current user [default: false]")]
@@ -83,7 +83,7 @@ enum Commands {
     #[arg(short = 'W', long, value_name = "SRC:DST", help = "Mount read-write directory")]
     write: Vec<String>,
 
-    #[arg(long, help = "The number of processes")]
+    #[arg(long, help = "The number of processes [default: 1]")]
     process: Option<u64>,
 
     #[arg(
@@ -93,7 +93,7 @@ enum Commands {
     )]
     ptrace: Option<Vec<String>>,
 
-    #[arg(long, help = "Disable chroot")]
+    #[arg(long, help = "Disable chroot [default: false]")]
     no_chroot: bool,
   },
 
