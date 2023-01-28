@@ -19,7 +19,7 @@ jobs:
 
       - run: npx changelogithub
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
   release:
     name: ${{ matrix.target }}
@@ -102,7 +102,7 @@ jobs:
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GH_TOKEN }}
           tag: ${{ github.ref }}
           file: catj-${{ matrix.target }}.${{ matrix.archive }}
           asset_name: catj-${{ matrix.target }}.${{ matrix.archive }}
@@ -111,7 +111,7 @@ jobs:
       - name: Upload checksum to release
         uses: svenstaro/upload-release-action@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GH_TOKEN }}
           tag: ${{ github.ref }}
           file: catj-${{ matrix.target }}-sha256sum.txt
           asset_name: catj-${{ matrix.target }}-sha256sum.txt
