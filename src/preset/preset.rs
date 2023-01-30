@@ -3,37 +3,42 @@ use crate::syscall::RestrictedSyscall;
 use crate::utils::mount::MountPoint;
 use crate::utils::{MemoryLimitType, TimeLimitType};
 
+#[derive(Debug, Clone)]
 pub(crate) struct LanguagePreset {
   pub(crate) compile: CompileOption,
   pub(crate) execute: ExecuteOption,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct CompileOption {
   pub(crate) extension: String,
   pub(crate) commands: Vec<ExecuteCommand>,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct ExecuteOption {
   pub(crate) commands: Vec<ExecuteCommand>,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) enum UserType {
   Nobody,
   Current,
   Root,
 }
 
+#[derive(Debug, Clone)]
 pub struct ExecuteCommand {
-  program: String,
-  argument: Vec<String>,
-  time_limit: TimeLimitType,
-  memory_limit: MemoryLimitType,
-  user: UserType,
-  process: u64,
-  ptrace: Vec<RestrictedSyscall>,
-  chroot: bool,
-  mounts: Vec<MountPoint>,
-  env: Vec<(String, String)>,
+  pub(crate) program: String,
+  pub(crate) arguments: Vec<String>,
+  pub(crate) time_limit: TimeLimitType,
+  pub(crate) memory_limit: MemoryLimitType,
+  pub(crate) user: UserType,
+  pub(crate) process: u64,
+  pub(crate) ptrace: Vec<RestrictedSyscall>,
+  pub(crate) chroot: bool,
+  pub(crate) mounts: Vec<MountPoint>,
+  pub(crate) env: Vec<(String, String)>,
 }
 
 impl CompileOption {
@@ -65,7 +70,7 @@ impl ExecuteCommand {
   pub(crate) fn new<PS: Into<String>, AS: Into<String>>(program: PS, arguments: Vec<AS>) -> Self {
     ExecuteCommand {
       program: program.into(),
-      argument: arguments.into_iter().map(|a| a.into()).collect(),
+      arguments: arguments.into_iter().map(|a| a.into()).collect(),
       time_limit: 1000,
       memory_limit: 262144,
       user: UserType::Nobody,
@@ -75,6 +80,24 @@ impl ExecuteCommand {
       mounts: vec![],
       env: vec![],
     }
+  }
+
+  fn apply(text: &str, source: &str, executable: &str) -> String {
+    text
+      .replace("${source}", source)
+      .replace("${executable}", executable)
+  }
+
+  pub(crate) fn apply_program(&self, source: &str, executable: &str) -> String {
+    Self::apply(self.program.as_str(), source, executable)
+  }
+
+  pub(crate) fn apply_arguments(&self, source: &str, executable: &str) -> Vec<String> {
+    self
+      .arguments
+      .iter()
+      .map(|a| Self::apply(a, source, executable))
+      .collect()
   }
 
   pub(crate) fn default_time_limit(mut self, value: TimeLimitType) -> Self {

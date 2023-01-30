@@ -50,7 +50,9 @@ pub struct CatBoxRunContext {
   results: Vec<CatBoxResult>,
 }
 
-pub struct CatBoxCompileContext {}
+pub struct CatBoxCompileContext {
+  ok: bool,
+}
 
 pub struct CatBoxJudgeContext {}
 
@@ -98,6 +100,7 @@ impl CatBox {
   /// Run all the commands
   pub fn start(&mut self) -> Result<(), CatBoxError> {
     for option in self.options.iter() {
+      dbg!(&option);
       let result = crate::run(&option)?;
       self.context.add_result(&option.label.clone(), result);
     }
@@ -244,9 +247,19 @@ impl CatBoxContext for CatBoxRunContext {
   }
 }
 
+impl CatBoxCompileContext {
+  fn new() -> Self {
+    CatBoxCompileContext { ok: true }
+  }
+}
+
 impl CatBoxContext for CatBoxCompileContext {
   fn add_result(&mut self, _label: &String, result: CatBoxResult) {
-    todo!()
+    if self.ok {
+      if result.status.unwrap_or(1) == 0 {
+        self.ok = false;
+      }
+    }
   }
 
   fn report_human(&self) {

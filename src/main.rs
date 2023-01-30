@@ -10,6 +10,7 @@ use log::{error, info};
 use crate::catbox::run;
 use crate::context::{CatBox, CatBoxBuilder, CatBoxOption};
 use crate::error::{CatBoxError, CatBoxExit};
+use crate::preset::make_compile_params;
 // use crate::preset::make_compile_params;
 use crate::utils::{default_format, GidType, MemoryLimitType, TimeLimitType, UidType};
 
@@ -59,7 +60,7 @@ struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
-enum Commands {
+pub(crate) enum Commands {
   #[command(about = "Run user program")]
   Run {
     #[arg(help = "Program to be executed")]
@@ -172,14 +173,9 @@ impl Cli {
         .parse_mount_read(read)?
         .parse_mount_write(write)?
         .done(),
-      Commands::Compile {
-        language,
-        submission,
-        output,
-        ..
-      } => {
+      Commands::Compile { .. } => {
         // make_compile_params(language, submission, output)?
-        unimplemented!()
+        make_compile_params(builder, self.command)?
       }
       Commands::Validate { .. } => {
         unimplemented!()

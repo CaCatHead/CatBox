@@ -21,5 +21,6 @@ lazy_static = "1.4.0"
 libc-stdhandle = "0.1.0"
 log = "0.4"
 nix = { version = "0.26.2", features = ["signal", "process", "ptrace", "user"] }
+path-absolutize = "3.0.14"
 remove_dir_all = "0.7.0"
 tempfile = "3"

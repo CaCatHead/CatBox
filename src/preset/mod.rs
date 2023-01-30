@@ -1,9 +1,16 @@
 use std::collections::HashMap;
+use std::fs::canonicalize;
+use std::path::PathBuf;
 
 use lazy_static::lazy_static;
+use log::info;
+use path_absolutize::*;
 
-use crate::context::CatBoxOption;
+use crate::context::{CatBoxBuilder, CatBoxOption};
 use crate::error::CatBoxError;
+use crate::preset::default::{CPP_PRESET, C_PRESET};
+use crate::preset::preset::UserType;
+use crate::Commands;
 
 mod default;
 mod preset;
@@ -42,28 +49,72 @@ fn detect_language(language: &Option<String>, submission: &String) -> Option<Str
   }
 }
 
-pub fn make_compile_params(
-  language: Option<String>,
-  submission: String,
-  _output: String,
-) -> Result<CatBoxOption, CatBoxError> {
-  let language = detect_language(&language, &submission)
-    .ok_or(CatBoxError::cli("Can not detect submission language"))?;
+pub(crate) fn make_compile_params(
+  mut builder: CatBoxBuilder,
+  command: Commands,
+) -> Result<CatBoxBuilder, CatBoxError> {
+  if let Commands::Compile {
+    language,
+    submission,
+    output,
+    ..
+  } = command
+  {
+    let language = detect_language(&language, &submission)
+      .ok_or(CatBoxError::cli("Can not detect submission language"))?;
 
-  unimplemented!()
-  // match language.as_str() {
-  //   "c" => {
-  //     let args = vec![];
-  //     let params = CatBoxOption::new("g++", args);
-  //     Ok(params)
-  //   }
-  //   "cpp" => {
-  //     let args = vec![];
-  //     let params = CatBoxOption::new("g++", args);
-  //     Ok(params)
-  //   }
-  //   _ => {
-  //     unimplemented!()
-  //   }
-  // }
+    let preset = match language.as_str() {
+      "c" => C_PRESET.clone(),
+      "cpp" => CPP_PRESET.clone(),
+      default => return Err(CatBoxError::cli("Can not find language preset")),
+    };
+
+    info!("Compile language {}", &language);
+
+    let submission = PathBuf::from(&submission);
+    let submission = submission.absolutize().unwrap();
+    let submission_dir = submission.parent().unwrap();
+    let output = PathBuf::from(&output);
+    let output = output.absolutize().unwrap();
+    let output_dir = output.parent().unwrap();
+
+    for command in preset.compile.commands.iter() {
+      let option_builder = builder
+        .command(
+          command.apply_program(submission.to_str().unwrap(), output.to_str().unwrap()),
+          command.apply_arguments(submission.to_str().unwrap(), output.to_str().unwrap()),
+        )
+        .time_limit(command.time_limit)
+        .memory_limit(command.memory_limit)
+        .set_process(Some(command.process))
+        .set_chroot(command.chroot)
+        .mount_read(submission_dir, submission_dir)
+        .mount_write(output_dir, output_dir)
+        .disable_ptrace();
+
+      let mut option_builder = match command.user {
+        UserType::Nobody => option_builder,
+        UserType::Current => option_builder.current_user(),
+        UserType::Root => {
+          unimplemented!()
+        }
+      };
+
+      for feat in command.ptrace.iter() {
+        option_builder = option_builder.ptrace(feat.clone())
+      }
+      for mount_point in command.mounts.iter() {
+        option_builder = option_builder.mount(mount_point.clone())
+      }
+      for (key, value) in command.env.iter() {
+        option_builder = option_builder.env(key, value);
+      }
+
+      builder = option_builder.done();
+    }
+
+    Ok(builder)
+  } else {
+    Err(CatBoxError::cli("unreachable"))
+  }
 }

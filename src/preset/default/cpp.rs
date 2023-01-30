@@ -19,7 +19,7 @@ lazy_static! {
           "-Wno-unused-result",
           "-static",
           "-lm",
-          "--std=c++20",
+          "-std=c++17",
           "-O2",
           "-DONLINE_JUDGE",
           "-Wall"

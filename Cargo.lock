@@ -61,6 +61,7 @@ dependencies = [
  "libc-stdhandle",
  "log",
  "nix 0.26.2",
+ "path-absolutize",
  "remove_dir_all 0.7.0",
  "tempfile",
 ]
@@ -534,6 +535,24 @@ name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
+
+[[package]]
+name = "path-absolutize"
+version = "3.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f1d4993b16f7325d90c18c3c6a3327db7808752db8d208cea0acee0abd52c52"
+dependencies = [
+ "path-dedot",
+]
+
+[[package]]
+name = "path-dedot"
+version = "3.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a81540d94551664b72b72829b12bd167c73c9d25fbac0e04fafa8023f7e4901"
+dependencies = [
+ "once_cell",
+]
 
 [[package]]
 name = "pin-utils"

@@ -56,7 +56,7 @@ impl CatBoxBuilder {
 
   /// Create a compile CatBox
   pub fn compile() -> Self {
-    Self::new(Box::new(CatBoxCompileContext {}))
+    Self::new(Box::new(CatBoxCompileContext::new()))
   }
 
   /// Create a judge CatBox
@@ -335,6 +335,12 @@ impl CatBoxOptionBuilder {
     self
   }
 
+  // Add mount point
+  pub fn mount(mut self, mount_point: MountPoint) -> Self {
+    self.option.mounts.push(mount_point);
+    self
+  }
+
   /// Mount read directory
   pub fn mount_read<SP: Into<PathBuf>, DP: Into<PathBuf>>(mut self, src: SP, dst: DP) -> Self {
     self
@@ -383,7 +389,7 @@ impl CatBoxOption {
     let current_user = User::from_uid(Uid::current()).unwrap().unwrap();
     let cgroup = env::var("CATJ_CGROUP").unwrap_or(current_user.name);
 
-    let catbox_user = User::from_name("Nobody").unwrap().unwrap();
+    let catbox_user = User::from_name("nobody").unwrap().unwrap();
     let catbox_group = Group::from_name("nogroup").unwrap().unwrap();
 
     CatBoxOption {
