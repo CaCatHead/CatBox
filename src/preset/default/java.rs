@@ -1,5 +1,7 @@
 use lazy_static::lazy_static;
 
+use crate::syscall::RestrictedSyscall;
+
 use crate::preset::preset::{
   CompileOption, ExecuteCommand, ExecuteOption, LanguagePreset, UserType,
 };
@@ -12,7 +14,7 @@ lazy_static! {
           .default_time_limit(10 * 1000)
           .default_memory_limit(1024 * 1024)
           .default_user(UserType::Current)
-          .default_process(10)
+          .default_process(20)
           .default_ptrace(vec![])
           .default_chroot(true)
           .append_read_mount("/proc", "/proc")
@@ -24,15 +26,17 @@ lazy_static! {
           .default_time_limit(10 * 1000)
           .default_memory_limit(1024 * 1024)
           .default_user(UserType::Current)
-          .default_process(10)
+          .default_process(20)
           .default_ptrace(vec![])
           .default_chroot(true)
           .append_read_mount("/proc", "/proc")
           .append_read_mount("/dev", "/dev")
       ),
-    execute: ExecuteOption::new().command(ExecuteCommand::new(
-      "java",
-      vec!["-cp", "${executable}", "Main"]
-    )),
+    execute: ExecuteOption::new().command(
+      ExecuteCommand::new("java", vec!["-Xmx512M", "-Xss64M", "-DONLINE_JUDGE=true", "-cp", "${executable}", "Main"])
+        .default_ptrace(vec![RestrictedSyscall::Net])
+        .default_process(20)
+        .append_read_mount("/proc", "/proc")
+    ),
   };
 }
