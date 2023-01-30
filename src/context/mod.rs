@@ -26,7 +26,7 @@ pub struct CatBox {
 
 /// CatBoxContext for storing running result
 pub trait CatBoxContext {
-  fn add_result(&mut self, label: &String, result: CatBoxResult);
+  fn add_result(&mut self, label: &String, result: CatBoxResult) -> bool;
 
   fn report(&self) {
     let is_tty = isatty(STDOUT_FILENO).unwrap_or(false);
@@ -100,9 +100,10 @@ impl CatBox {
   /// Run all the commands
   pub fn start(&mut self) -> Result<(), CatBoxError> {
     for option in self.options.iter() {
-      dbg!(&option);
       let result = crate::run(&option)?;
-      self.context.add_result(&option.label.clone(), result);
+      if !self.context.add_result(&option.label.clone(), result) {
+        break;
+      }
     }
     Ok(())
   }
@@ -189,12 +190,13 @@ impl CatBoxRunContext {
 }
 
 impl CatBoxContext for CatBoxRunContext {
-  fn add_result(&mut self, _label: &String, result: CatBoxResult) {
+  fn add_result(&mut self, _label: &String, result: CatBoxResult) -> bool {
     self.max_time = max(self.max_time, result.time);
     self.max_memory = max(self.max_memory, result.memory);
     self.sum_time += result.time;
     self.sum_memory += result.memory;
     self.results.push(result);
+    true
   }
 
   fn report_human(&self) {
@@ -254,11 +256,16 @@ impl CatBoxCompileContext {
 }
 
 impl CatBoxContext for CatBoxCompileContext {
-  fn add_result(&mut self, _label: &String, result: CatBoxResult) {
+  fn add_result(&mut self, _label: &String, result: CatBoxResult) -> bool {
     if self.ok {
       if result.status.unwrap_or(1) == 0 {
-        self.ok = false;
+        self.ok = true;
+        true
+      } else {
+        false
       }
+    } else {
+      false
     }
   }
 
@@ -272,7 +279,7 @@ impl CatBoxContext for CatBoxCompileContext {
 }
 
 impl CatBoxContext for CatBoxJudgeContext {
-  fn add_result(&mut self, _label: &String, result: CatBoxResult) {
+  fn add_result(&mut self, _label: &String, result: CatBoxResult) -> bool {
     todo!()
   }
 

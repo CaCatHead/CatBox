@@ -1,14 +1,13 @@
 use std::collections::HashMap;
-use std::fs::canonicalize;
 use std::path::PathBuf;
 
 use lazy_static::lazy_static;
 use log::info;
 use path_absolutize::*;
 
-use crate::context::{CatBoxBuilder, CatBoxOption};
+use crate::context::CatBoxBuilder;
 use crate::error::CatBoxError;
-use crate::preset::default::{CPP_PRESET, C_PRESET};
+use crate::preset::default::{CPP_PRESET, C_PRESET, JAVA_PRESET};
 use crate::preset::preset::UserType;
 use crate::Commands;
 
@@ -66,10 +65,14 @@ pub(crate) fn make_compile_params(
     let preset = match language.as_str() {
       "c" => C_PRESET.clone(),
       "cpp" => CPP_PRESET.clone(),
-      default => return Err(CatBoxError::cli("Can not find language preset")),
+      "java" => JAVA_PRESET.clone(),
+      _ => return Err(CatBoxError::cli("Can not find language preset")),
     };
 
     info!("Compile language {}", &language);
+
+    // let root_dir = tempdir().unwrap();
+    // let root_dir = root_dir.into_path();
 
     let submission = PathBuf::from(&submission);
     let submission = submission.absolutize().unwrap();
@@ -90,6 +93,7 @@ pub(crate) fn make_compile_params(
         .set_chroot(command.chroot)
         .mount_read(submission_dir, submission_dir)
         .mount_write(output_dir, output_dir)
+        .cwd(&output_dir)
         .disable_ptrace();
 
       let mut option_builder = match command.user {

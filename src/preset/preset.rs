@@ -1,4 +1,4 @@
-use crate::context::CatBoxOption;
+use std::path::PathBuf;
 use crate::syscall::RestrictedSyscall;
 use crate::utils::mount::MountPoint;
 use crate::utils::{MemoryLimitType, TimeLimitType};
@@ -130,7 +130,9 @@ impl ExecuteCommand {
     self
   }
 
-  pub(crate) fn append_read_mount(mut self) -> Self {
+  pub(crate) fn append_read_mount(mut self, src: impl Into<PathBuf>, dst: impl Into<PathBuf>) -> Self {
+    let point = MountPoint::read(src.into(), dst.into());
+    self.mounts.push(point);
     self
   }
 
