@@ -1,6 +1,6 @@
 [package]
 name = "catj"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["XLor yjl9903@outlook.com"]
 edition = "2021"
 
