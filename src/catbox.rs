@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use libc_stdhandle::{stderr, stdin, stdout};
 use log::{debug, error, info};
-use nix::libc::{self, freopen};
+use nix::libc::{self, freopen, ptrace};
 use nix::mount::{mount, MsFlags};
 use nix::sys::ptrace;
 use nix::sys::resource::{setrlimit, Resource};
@@ -312,9 +312,10 @@ pub fn run(option: &CatBoxOption) -> Result<CatBoxResult, CatBoxError> {
               | Signal::SIGSYS
               | Signal::SIGXFSZ => {
                 info!("Child process #{}. is stopped by {}", pid, signal);
-                ptrace::kill(pid)?;
                 last_signal = Some(signal);
-                break (None, Some(signal));
+                ptrace::cont(pid, signal)?;
+                // ptrace::kill(pid)?;
+                // break (None, Some(signal));
               }
               // 未捕获 SIGCONT，不是终端
               Signal::SIGCONT | Signal::SIGHUP | Signal::SIGINT => {

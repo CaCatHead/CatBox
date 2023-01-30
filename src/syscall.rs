@@ -63,7 +63,7 @@ impl SyscallFilter {
     match feature {
       RestrictedSyscall::Net => {
         self
-          .forbid(SYS_socket)
+          // .forbid(SYS_socket)
           .forbid(SYS_socketpair)
           .forbid(SYS_setsockopt)
           .forbid(SYS_getsockopt)
@@ -73,7 +73,7 @@ impl SyscallFilter {
           .forbid(SYS_listen)
           .forbid(SYS_accept)
           .forbid(SYS_accept4)
-          .forbid(SYS_connect)
+          // .forbid(SYS_connect)
           .forbid(SYS_shutdown);
       }
       RestrictedSyscall::Process => {
