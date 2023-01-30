@@ -277,9 +277,10 @@ pub fn run(option: &CatBoxOption) -> Result<CatBoxResult, CatBoxError> {
                   "Child process #{}. is stopped by {} (may be time limit exceeded)",
                   pid, signal
                 );
-                ptrace::kill(pid)?;
                 last_signal = Some(signal);
-                break (None, Some(signal));
+                ptrace::cont(pid, signal)?;
+                // ptrace::kill(pid)?;
+                // break (None, Some(signal));
               }
               // 处理系统调用
               Signal::SIGTRAP => {
