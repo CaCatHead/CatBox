@@ -275,16 +275,6 @@ impl CatBoxOptionBuilder {
     self
   }
 
-  /// Set chroot or not
-  pub fn set_chroot(mut self, flag: bool) -> Self {
-    if flag {
-      self.chroot()
-    } else {
-      self.option.chroot = None;
-      self
-    }
-  }
-
   /// Parse ptrace syscall filter
   pub fn parse_ptrace_presets(mut self, presets: Option<Vec<String>>) -> Result<Self, CatBoxError> {
     if let Some(presets) = presets {
@@ -309,6 +299,16 @@ impl CatBoxOptionBuilder {
   pub fn disable_ptrace(mut self) -> Self {
     self.option.ptrace = None;
     self
+  }
+
+  /// Set chroot or not
+  pub fn set_chroot(mut self, flag: bool) -> Self {
+    if flag {
+      self.chroot()
+    } else {
+      self.option.chroot = None;
+      self
+    }
   }
 
   /// Enable chroot
