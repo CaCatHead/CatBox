@@ -1,17 +1,14 @@
 use std::ffi::{c_uint, CString};
 use std::fs::create_dir_all;
-
 use std::path::{Path, PathBuf};
 
 use libc_stdhandle::{stderr, stdin, stdout};
 use log::{debug, error, info};
-
 use nix::libc::{self, freopen};
 use nix::mount::{mount, MsFlags};
 use nix::sys::ptrace;
 use nix::sys::resource::{setrlimit, Resource};
 use nix::sys::signal::Signal;
-
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{alarm, chdir, chroot, execvpe, fork, setgid, setuid, ForkResult};
 

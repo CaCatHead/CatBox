@@ -1,16 +1,18 @@
+use std::env;
+use std::ffi::CString;
+use std::path::{Path, PathBuf};
+
+use log::{debug, error};
+use nix::libc;
+use nix::mount::{umount2, MntFlags};
+use nix::unistd::{Gid, Group, Uid, User};
+use tempfile::tempdir;
+
 use crate::context::{CatBoxCompileContext, CatBoxContext, CatBoxJudgeContext, CatBoxRunContext};
 use crate::syscall::{RestrictedSyscall, SyscallFilter};
 use crate::utils::mount::MountPoint;
 use crate::utils::{into_c_string, parse_env, GidType, MemoryLimitType, TimeLimitType, UidType};
 use crate::{CatBox, CatBoxError, CatBoxOption};
-use log::{debug, error};
-use nix::libc;
-use nix::mount::{umount2, MntFlags};
-use nix::unistd::{Gid, Group, Uid, User};
-use std::env;
-use std::ffi::CString;
-use std::path::{Path, PathBuf};
-use tempfile::tempdir;
 
 /// Build CatBox
 pub struct CatBoxBuilder {
@@ -381,7 +383,7 @@ impl CatBoxOption {
     let current_user = User::from_uid(Uid::current()).unwrap().unwrap();
     let cgroup = env::var("CATJ_CGROUP").unwrap_or(current_user.name);
 
-    let catbox_user = User::from_name("nobody").unwrap().unwrap();
+    let catbox_user = User::from_name("Nobody").unwrap().unwrap();
     let catbox_group = Group::from_name("nogroup").unwrap().unwrap();
 
     CatBoxOption {

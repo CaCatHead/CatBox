@@ -1,11 +1,13 @@
-use flexi_logger::DeferredNow;
-use log::{error, info, Record};
-use nix::libc::{gid_t, uid_t};
 use std::env;
 use std::ffi::CString;
 
-use crate::CatBoxError;
+use flexi_logger::DeferredNow;
+use log::{error, info, Record};
+use nix::libc::{gid_t, uid_t};
+
 pub use pipe::{CatBoxPipe, CatBoxReadPipe, CatBoxWritePipe};
+
+use crate::CatBoxError;
 
 pub mod mount;
 pub mod pipe;

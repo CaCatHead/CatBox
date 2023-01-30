@@ -42,7 +42,7 @@ struct Cli {
   #[arg(long, help = "Current working directory [default: ./]")]
   cwd: Option<PathBuf>,
 
-  #[arg(long, help = "Child process uid [default: nobody]")]
+  #[arg(long, help = "Child process uid [default: Nobody]")]
   uid: Option<UidType>,
 
   #[arg(long, help = "Child process gid [default: nogroup]")]

@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
-use crate::error::CatBoxError;
 use lazy_static::lazy_static;
 
-use super::context::CatBoxOption;
+use crate::context::CatBoxOption;
+use crate::error::CatBoxError;
+
+mod default;
+mod preset;
 
 lazy_static! {
   static ref DETECT_LANGUAGE_MAP: HashMap<&'static str, &'static str> = {
@@ -63,60 +66,4 @@ pub fn make_compile_params(
   //     unimplemented!()
   //   }
   // }
-}
-
-struct CompileOption {
-  time_limit: u64,
-  memory_limit: u64,
-  process: u64,
-  commands: Vec<CompileCommand>,
-}
-
-struct CompileCommand {
-  program: String,
-  argument: Vec<String>,
-}
-
-impl CompileOption {
-  fn new() -> Self {
-    CompileOption {
-      time_limit: 10000,
-      memory_limit: 1048576,
-      process: 10,
-      commands: vec![],
-    }
-  }
-
-  fn command<PS: Into<String>, AS: Into<String>>(
-    self: &mut Self,
-    program: PS,
-    arguments: Vec<AS>,
-  ) -> &mut Self {
-    let command = CompileCommand::new(program, arguments);
-    self.commands.push(command);
-    self
-  }
-
-  fn resolve(self: Self) -> Vec<CatBoxOption> {
-    unimplemented!()
-    // let mut commands = vec![];
-    // for command in self.commands {
-    //   let mut params = CatBoxOption::new(command.program, command.argument);
-    //   params
-    //     .time_limit(self.time_limit)
-    //     .memory_limit(self.memory_limit)
-    //     .process(self.process);
-    //   commands.push(params);
-    // }
-    // commands
-  }
-}
-
-impl CompileCommand {
-  fn new<PS: Into<String>, AS: Into<String>>(program: PS, arguments: Vec<AS>) -> Self {
-    CompileCommand {
-      program: program.into(),
-      argument: arguments.into_iter().map(|a| a.into()).collect(),
-    }
-  }
 }

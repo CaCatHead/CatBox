@@ -8,13 +8,13 @@ use nix::libc::STDOUT_FILENO;
 use nix::sys::signal::Signal;
 use nix::unistd::{isatty, Gid, Uid};
 
+pub use builder::{CatBoxBuilder, CatBoxOptionBuilder};
+
 use crate::cgroup::CatBoxUsage;
 use crate::syscall::SyscallFilter;
 use crate::utils::mount::MountPoint;
 use crate::utils::{MemoryLimitType, TimeLimitType};
 use crate::CatBoxError;
-
-pub use builder::{CatBoxBuilder, CatBoxOptionBuilder};
 
 mod builder;
 

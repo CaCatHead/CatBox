@@ -1,7 +1,9 @@
-use crate::CatBoxError;
-use log::error;
 use std::fs::canonicalize;
 use std::path::PathBuf;
+
+use log::error;
+
+use crate::CatBoxError;
 
 /// Mount point
 #[derive(Debug, Clone)]
