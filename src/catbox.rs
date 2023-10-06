@@ -284,25 +284,42 @@ pub fn run(option: &CatBoxOption) -> Result<CatBoxResult, CatBoxError> {
               }
               // 处理系统调用
               Signal::SIGTRAP => {
-                let user_regs = ptrace::getregs(pid)?;
-                // let syscall_id = user_regs.orig_rax;
-                // debug!(
-                //   "Child process #{}. performed a syscall: {}",
-                //   pid, syscall_id
-                // );
+                match ptrace::getregs(pid) {
+                  Ok(user_regs) => {
+                    // let syscall_id = user_regs.orig_rax;
+                    // debug!(
+                    //   "Child process #{}. performed a syscall: {}",
+                    //   pid, syscall_id
+                    // );
 
-                if let Some(filter) = &mut filter {
-                  if filter.filter(&pid, &user_regs) {
-                    ptrace::syscall(pid, None)?;
-                  } else {
-                    info!(
-                      "Child process #{}. is stopped for forbidden syscall (id = {})",
-                      pid, user_regs.orig_rax
-                    );
-                    ptrace::kill(pid)?;
+                    if let Some(filter) = &mut filter {
+                      if filter.filter(&pid, &user_regs) {
+                        debug!(
+                          "Child process #{}. is continued for allowed syscall (id = {})",
+                          pid, user_regs.orig_rax
+                        );
+                        ptrace::syscall(pid, None)?;
+                      } else {
+                        info!(
+                          "Child process #{}. is stopped for forbidden syscall (id = {})",
+                          pid, user_regs.orig_rax
+                        );
+                        ptrace::kill(pid)?;
+                      }
+                    } else {
+                      debug!(
+                        "Child process #{}. is continued for allowed syscall (id = {})",
+                        pid, user_regs.orig_rax
+                      );
+                      ptrace::syscall(pid, None)?;
+                    }
                   }
-                } else {
-                  ptrace::syscall(pid, None)?;
+                  Err(err) => {
+                    // See https://man7.org/linux/man-pages/man2/ptrace.2.html
+                    // PTRACE_GETREGS and PTRACE_GETFPREGS are not present on all architectures.
+                    error!("Fails handling SIGTRAP: {}", err);
+                    ptrace::syscall(pid, None)?;
+                  }
                 }
               }
               // 因为各种原因 RE
@@ -346,6 +363,8 @@ pub fn run(option: &CatBoxOption) -> Result<CatBoxResult, CatBoxError> {
           }
         }
       };
+
+      debug!("Finish waiting for child process");
 
       if let Ok(message) = pipe.read() {
         if message.len() > 0 {
