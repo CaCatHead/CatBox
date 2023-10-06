@@ -4,6 +4,7 @@ use std::cmp::max;
 use std::path::PathBuf;
 use std::slice::Iter;
 
+use log::info;
 use nix::libc::STDOUT_FILENO;
 use nix::sys::signal::Signal;
 use nix::unistd::{isatty, Gid, Uid};
@@ -100,6 +101,8 @@ impl CatBox {
   /// Run all the commands
   pub fn start(&mut self) -> Result<(), CatBoxError> {
     for option in self.options.iter() {
+      info!("Run catbox with options: {:?}", &option);
+
       let result = crate::run(&option)?;
       if !self.context.add_result(&option.label.clone(), result) {
         break;

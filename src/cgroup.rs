@@ -6,7 +6,7 @@ use cgroups_rs::cpuacct::{CpuAcct, CpuAcctController};
 use cgroups_rs::memory::{MemController, MemSwap, Memory};
 use cgroups_rs::pid::PidController;
 use cgroups_rs::{Cgroup, CgroupPid, Controller, MaxValue};
-use log::{debug, error, warn};
+use log::{debug, error, warn, info};
 use nix::sys::resource::{getrusage, UsageWho};
 use nix::sys::time::TimeVal;
 use nix::unistd::Pid;
@@ -33,6 +33,15 @@ impl CatBoxCgroup {
   pub fn new(option: &CatBoxOption, child: Pid) -> Result<Self, CatBoxError> {
     let hierarchy = cgroups_rs::hierarchies::auto();
 
+    info!(
+      "Support cgroup subsystems: {:?}",
+      hierarchy
+        .subsystems()
+        .iter()
+        .map(|subsystem| subsystem.controller_name())
+        .collect::<Vec<String>>()
+    );
+
     let mut enable_cpuacct = hierarchy
       .subsystems()
       .iter()
@@ -53,7 +62,7 @@ impl CatBoxCgroup {
 
     let cgroup_name = format!("{}/{}.{}", option.cgroup(), option.cgroup(), child.as_raw());
 
-    debug!("Init cgroup {}", cgroup_name);
+    info!("Start initializing cgroup {}", cgroup_name);
 
     let builder = CgroupBuilder::new(cgroup_name.as_str());
     let builder = if enable_memory {
@@ -158,6 +167,8 @@ impl CatBoxCgroup {
         error!("Get pids cgroup controller fails")
       }
     }
+
+    info!("Finish initializing cgroup {}", cgroup_name);
 
     // 默认回退到不使用 cgroup，force 模式下报错
     if !enable_cpuacct {

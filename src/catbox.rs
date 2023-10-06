@@ -126,7 +126,7 @@ fn redirect_io(option: &CatBoxOption) -> Result<(), CatBoxError> {
 fn set_alarm(option: &CatBoxOption) {
   let time_limit = (option.time_limit() as f64 / 1000.0 as f64).ceil() as c_uint;
   alarm::set(time_limit + 1);
-  debug!("Set alarm {} seconds", time_limit + 1);
+  info!("Set alarm {} seconds", time_limit + 1);
 }
 
 /// 调用 setrlimit
