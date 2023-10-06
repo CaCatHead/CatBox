@@ -1,4 +1,4 @@
-use catj::{run, CatBoxBuilder, CatBoxResult, RestrictedSyscall};
+use catj::{run, CatBoxBuilder, CatBoxResult};
 use log::info;
 use nix::sys::signal::Signal;
 use std::env::current_dir;
@@ -246,4 +246,12 @@ fn it_should_not_run_re2() {
   let result = run_fail_cpp("re2.c", 1000, 262144);
   assert_eq!(*result.status(), None);
   assert_eq!(*result.signal(), Some(Signal::SIGSEGV));
+}
+
+#[test]
+fn it_should_not_run_assert() {
+  common::setup();
+  let result = run_fail_cpp("assert.cpp", 1000, 262144);
+  assert_eq!(*result.status(), None);
+  assert_eq!(*result.signal(), Some(Signal::SIGABRT));
 }
