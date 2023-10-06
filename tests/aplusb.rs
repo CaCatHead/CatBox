@@ -252,6 +252,6 @@ fn it_should_not_run_re2() {
 fn it_should_not_run_assert() {
   common::setup();
   let result = run_fail_cpp("assert.cpp", 1000, 262144);
-  assert_eq!(*result.status(), Some(0));
+  assert_eq!(*result.status(), None);
   assert_eq!(*result.signal(), Some(Signal::SIGABRT));
 }
