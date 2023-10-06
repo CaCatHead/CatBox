@@ -390,7 +390,7 @@ impl CatBoxOption {
     let cgroup = env::var("CATJ_CGROUP").unwrap_or(current_user.name);
 
     let catbox_user = User::from_name("nobody").unwrap().unwrap();
-    let catbox_group = Group::from_name("nogroup").unwrap().unwrap();
+    let catbox_group = Group::from_gid(catbox_user.gid).unwrap().unwrap();
 
     CatBoxOption {
       label: "catbox".to_string(),
