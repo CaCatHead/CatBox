@@ -15,4 +15,5 @@ export default async function(version: string) {
   await $`git commit -m "chore: release v${version}"`;
   await $`git tag -a v${version} -m "chore: release v${version}"`;
   await $`git push --tags origin main`;
+  await $`cargo publish`;
 }
