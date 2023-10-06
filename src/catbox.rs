@@ -311,7 +311,8 @@ pub fn run(option: &CatBoxOption) -> Result<CatBoxResult, CatBoxError> {
               | Signal::SIGILL
               | Signal::SIGSEGV
               | Signal::SIGSYS
-              | Signal::SIGXFSZ => {
+              | Signal::SIGXFSZ
+              | Signal::SIGABRT => {
                 info!("Child process #{}. is stopped by {}", pid, signal);
                 last_signal = Some(signal);
                 ptrace::cont(pid, signal)?;
