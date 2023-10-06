@@ -4,9 +4,9 @@ use std::ffi::{c_long, c_ulonglong};
 use std::fmt::{Debug, Formatter};
 
 use nix::libc::{
-  user_regs_struct, SYS_accept, SYS_accept4, SYS_bind, SYS_clone, SYS_clone3, SYS_connect,
+  user_regs_struct, SYS_accept, SYS_accept4, SYS_bind, SYS_clone, SYS_clone3,
   SYS_execve, SYS_execveat, SYS_fork, SYS_getpeername, SYS_getsockname, SYS_getsockopt, SYS_listen,
-  SYS_setsockopt, SYS_shutdown, SYS_socket, SYS_socketpair, SYS_vfork,
+  SYS_setsockopt, SYS_shutdown, SYS_socketpair, SYS_vfork,
 };
 use nix::unistd::Pid;
 

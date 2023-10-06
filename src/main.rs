@@ -214,7 +214,7 @@ fn bootstrap() -> Result<(), CatBoxError> {
   let mut catbox = cli.resolve()?;
 
   let result = match catbox.start() {
-    Ok(results) => {
+    Ok(_) => {
       info!("Running catj finished");
       if report {
         if !json_format {
