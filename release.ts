@@ -11,9 +11,9 @@ export default async function(version: string) {
   writeTextFile('Cargo.toml', toml.replace(/version = "\d+\.\d+\.\d+"/, `version = "${version}"`));
   writeTextFile('README.md', readTextFile('README.md').replace(/catj \d+\.\d+\.\d+/, `catj ${version}`));
 
+  await $`cargo publish`;
   await $`git add .`;
   await $`git commit -m "chore: release v${version}"`;
   await $`git tag -a v${version} -m "chore: release v${version}"`;
   await $`git push --tags origin main`;
-  await $`cargo publish`;
 }
