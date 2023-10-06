@@ -13,14 +13,14 @@ keywords = ["sandbox", "cli"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-cgroups-rs = "0.3.0"
-chrono = "0.4.23"
-clap = { version = "4.1.1", features = ["derive"] }
-flexi_logger = "0.24.2"
+cgroups-rs = "0.3.3"
+chrono = "0.4.31"
+clap = { version = "4.4.6", features = ["derive"] }
+flexi_logger = "0.27.2"
 lazy_static = "1.4.0"
 libc-stdhandle = "0.1.0"
-log = "0.4"
+log = "0.4.20"
 nix = { version = "0.26.2", features = ["signal", "process", "ptrace", "user"] }
-path-absolutize = "3.0.14"
-remove_dir_all = "0.7.0"
-tempfile = "3"
+path-absolutize = "3.1.1"
+remove_dir_all = "0.8.2"
+tempfile = "3.8.0"
